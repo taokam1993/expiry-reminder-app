@@ -81,6 +81,9 @@
         </div>
       </div>
 
+      <!-- สถานะการซิงค์ข้อมูล -->
+      <div id="sync-badge" class="mt-2 text-[11px] text-gray-400 flex items-center gap-1"></div>
+
       <!-- ค้นหา + กรองหมวดหมู่ -->
       <div class="mt-3">
         <!-- ช่องค้นหา -->
@@ -218,14 +221,31 @@
      - ถ้าปล่อยว่างไว้ ระบบจะ fallback ไปใช้ localStorage ให้อัตโนมัติ
        (สะดวกตอนทดสอบ UI ก่อนเชื่อม Backend จริง)
      ========================================================= */
-  const GAS_URL = ''; // <-- ใส่ลิงก์ GAS ตรงนี้
+  const GAS_URL = ''; // <-- ใส่ลิงก์ GAS ตรงนี้ (ทางเลือกเดิม)
+
+  /* =========================================================
+     ☁️  ตั้งค่า Firebase (sync ข้ามอุปกรณ์แบบเรียลไทม์)
+     ----------------------------------------------------------
+     วิธีได้ค่านี้: console.firebase.google.com > สร้าง project >
+     เพิ่ม Web app (</>) > จะได้ object firebaseConfig มาวางทับด้านล่าง
+     - ถ้า apiKey ยังว่าง ระบบจะใช้ localStorage / GAS ตามเดิม
+     - ลำดับความสำคัญ: Firebase > GAS > localStorage
+     ========================================================= */
+  const firebaseConfig = {
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    storageBucket: '',
+    messagingSenderId: '',
+    appId: '',
+  };
 
   /* =========================================================
      DATA LAYER (Repository Pattern)
      ----------------------------------------------------------
-     ทุกเมธอดคืนค่าเป็น Promise. ภายในเลือกใช้ระหว่าง
-     RemoteStore (GAS) หรือ LocalStore (localStorage) อัตโนมัติ
-     ตามว่าได้ตั้งค่า GAS_URL ไว้หรือยัง
+     ทุกเมธอดคืนค่าเป็น Promise. ภายในเลือกใช้ระหว่าง FirebaseStore /
+     RemoteStore (GAS) / LocalStore (localStorage) อัตโนมัติ
+     ตามค่าที่ตั้งไว้ (ดูฟังก์ชัน initStore ด้านล่าง)
      ========================================================= */
 
   // --- โหมด localStorage (ใช้เมื่อยังไม่ได้ตั้ง GAS_URL) ---
@@ -286,8 +306,60 @@
     async remove(id)       { return this._post('delete', { id }); },
   };
 
-  // เลือก backend ตามการตั้งค่า
-  const Store = GAS_URL ? RemoteStore : LocalStore;
+  // --- โหมด Firebase (Cloud Firestore) ---
+  // โหลด SDK แบบ dynamic import จาก CDN เฉพาะตอนที่ตั้งค่า firebaseConfig แล้ว
+  async function createFirebaseStore() {
+    const V = '10.12.0';
+    const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+    const { getAuth, signInAnonymously } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
+    const { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc } =
+      await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+
+    const app = initializeApp(firebaseConfig);
+    await signInAnonymously(getAuth(app)); // เข้าใช้แบบ anonymous (ต้องเปิด Anonymous ใน console)
+    const db = getFirestore(app);
+    const col = () => collection(db, 'items');
+
+    return {
+      async getAll() {
+        const snap = await getDocs(col());
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      },
+      async add(item) {
+        const payload = {
+          name: item.name, category: item.category, date: item.date,
+          repeat: item.repeat || 'none', createdAt: new Date().toISOString(),
+        };
+        const ref = await addDoc(col(), payload);
+        return { id: ref.id, ...payload };
+      },
+      async update(id, data) {
+        await updateDoc(doc(db, 'items', id), {
+          name: data.name, category: data.category, date: data.date, repeat: data.repeat || 'none',
+        });
+      },
+      async remove(id) {
+        await deleteDoc(doc(db, 'items', id));
+      },
+    };
+  }
+
+  // เลือก backend ตามการตั้งค่า (เรียกครั้งเดียวตอนเริ่มแอป)
+  // ลำดับความสำคัญ: Firebase > Google Apps Script > localStorage
+  let Store;
+  let SYNC_MODE = 'local';
+  async function initStore() {
+    if (firebaseConfig && firebaseConfig.apiKey) {
+      Store = await createFirebaseStore();
+      SYNC_MODE = 'firebase';
+    } else if (GAS_URL) {
+      Store = RemoteStore;
+      SYNC_MODE = 'gas';
+    } else {
+      Store = LocalStore;
+      SYNC_MODE = 'local';
+    }
+  }
 
   /* =========================================================
      LOGIC: คำนวณสถานะจากวันที่
@@ -467,6 +539,17 @@
         class="shrink-0 whitespace-nowrap text-sm px-3 py-1.5 rounded-full border font-medium transition ${cls}">
         ${b.icon} ${b.label}</button>`;
     }).join('');
+  }
+
+  // แสดงสถานะว่าตอนนี้เก็บข้อมูลที่ไหน
+  function updateSyncBadge() {
+    const badge = document.getElementById('sync-badge');
+    const map = {
+      firebase: '☁️ ซิงค์ข้ามอุปกรณ์ (Firebase)',
+      gas:      '☁️ ซิงค์ผ่าน Google Sheet',
+      local:    '📱 เก็บข้อมูลในเครื่องนี้',
+    };
+    badge.textContent = map[SYNC_MODE] || map.local;
   }
 
   function renderCard(item) {
@@ -704,8 +787,19 @@
   (async function init() {
     renderFilterBar();
 
+    // เลือก backend (Firebase / GAS / localStorage) ให้เสร็จก่อนใช้งาน
+    showState('loading');
+    try {
+      await initStore();
+    } catch (err) {
+      els.errorDetail.textContent = 'เชื่อมต่อระบบซิงค์ไม่สำเร็จ: ' + (err.message || err);
+      showState('error');
+      return;
+    }
+    updateSyncBadge();
+
     // ใส่ข้อมูลตัวอย่างครั้งแรก เฉพาะโหมด localStorage เท่านั้น
-    // (โหมด GAS จะไม่ seed เพื่อไม่ให้เขียนข้อมูลตัวอย่างลงชีตจริง)
+    // (โหมด Firebase/GAS จะไม่ seed เพื่อไม่ให้เขียนข้อมูลตัวอย่างลงฐานข้อมูลจริง)
     if (Store === LocalStore) {
       const existing = await Store.getAll();
       if (existing.length === 0) {
