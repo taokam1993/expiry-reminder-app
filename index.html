@@ -15,12 +15,17 @@
   <meta name="apple-mobile-web-app-title" content="แจ้งเตือนหมดอายุ" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
 
+  <!-- ใช้ธีมที่บันทึกไว้ทันที (กันจอกระพริบตอนโหลด) -->
+  <script>
+    if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: { sans: ['"Noto Sans Thai"', 'sans-serif'] }
@@ -40,6 +45,35 @@
     /* Pulse สำหรับการ์ดด่วน */
     @keyframes softpulse { 0%,100%{ box-shadow:0 0 0 0 rgba(239,68,68,.0);} 50%{ box-shadow:0 0 0 4px rgba(239,68,68,.12);} }
     .pulse-critical { animation: softpulse 2s ease-in-out infinite; }
+
+    /* ===== โหมดมืด (Dark mode) — override สีของ utility ที่ใช้ในแอป ===== */
+    html.dark body { background-color:#0f172a; }
+    html.dark .bg-gray-50 { background-color:#0f172a; }
+    html.dark .bg-white { background-color:#1e293b; }
+    html.dark .bg-gray-100 { background-color:#334155; }
+    html.dark .text-gray-800 { color:#f1f5f9; }
+    html.dark .text-gray-700 { color:#e2e8f0; }
+    html.dark .text-gray-600 { color:#cbd5e1; }
+    html.dark .text-gray-500 { color:#94a3b8; }
+    html.dark .text-gray-400 { color:#94a3b8; }
+    html.dark .border-gray-300 { border-color:#475569; }
+    html.dark .border-gray-200 { border-color:#334155; }
+    html.dark .border-gray-100 { border-color:#334155; }
+    html.dark input, html.dark select, html.dark textarea { color:#f1f5f9; }
+    html.dark input::placeholder, html.dark textarea::placeholder { color:#64748b; }
+    /* การ์ดสรุป (stat) ในโหมดมืด ให้เป็นโทนสีจางบนพื้นเข้ม */
+    html.dark .bg-red-50 { background-color:rgba(239,68,68,.13); }
+    html.dark .border-red-100 { border-color:rgba(239,68,68,.30); }
+    html.dark .bg-amber-50 { background-color:rgba(245,158,11,.13); }
+    html.dark .border-amber-100 { border-color:rgba(245,158,11,.30); }
+    html.dark .bg-emerald-50 { background-color:rgba(16,185,129,.13); }
+    html.dark .border-emerald-100 { border-color:rgba(16,185,129,.30); }
+    html.dark .hover\:bg-gray-50:hover { background-color:#334155; }
+    /* ป้าย tag สถานะบนการ์ด ปรับให้อ่านง่ายบนพื้นมืด */
+    html.dark .bg-red-100 { background-color:rgba(239,68,68,.20); }
+    html.dark .bg-amber-100 { background-color:rgba(245,158,11,.20); }
+    html.dark .bg-emerald-100 { background-color:rgba(16,185,129,.20); }
+    html.dark .bg-blue-50 { background-color:rgba(59,130,246,.18); }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
@@ -50,6 +84,16 @@
       <div class="flex items-center gap-2 mb-3">
         <span class="text-2xl">🔔</span>
         <h1 class="text-lg font-semibold text-gray-800 flex-1">ระบบแจ้งเตือนวันหมดอายุ</h1>
+        <!-- สลับโหมดมืด/สว่าง -->
+        <button id="btn-theme" title="สลับโหมดมืด/สว่าง"
+          class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="สลับธีม">
+          <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+          <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        </button>
         <!-- สำรอง / นำเข้าข้อมูล -->
         <button id="btn-export" title="สำรองข้อมูล (ดาวน์โหลด)"
           class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="สำรองข้อมูล">
@@ -98,6 +142,17 @@
         <!-- ปุ่มกรองหมวดหมู่ (เลื่อนแนวนอนได้บนจอเล็ก) -->
         <div id="filter-bar" class="flex gap-2 mt-2 overflow-x-auto pb-1 -mx-1 px-1">
           <!-- ปุ่มถูก render ด้วย JS -->
+        </div>
+
+        <!-- จัดกลุ่มการ์ด -->
+        <div class="flex items-center justify-end gap-2 mt-2">
+          <label for="group-select" class="text-xs text-gray-500">จัดกลุ่ม:</label>
+          <select id="group-select"
+            class="text-xs rounded-lg border border-gray-300 px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="none">ไม่จัดกลุ่ม</option>
+            <option value="status">ตามความเร่งด่วน</option>
+            <option value="category">ตามหมวดหมู่</option>
+          </select>
         </div>
       </div>
     </div>
@@ -191,6 +246,37 @@
             </span>
           </label>
 
+          <!-- โน้ต / รายละเอียดเพิ่มเติม -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">โน้ต / รายละเอียด <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+            <textarea id="item-note" rows="2" placeholder="เช่น เลขทะเบียน, สถานที่นัด, หมายเหตุ..."
+              class="w-full rounded-lg border border-gray-300 px-3 py-2.5 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea>
+          </div>
+
+          <!-- แนบรูป -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">รูปภาพ <span class="text-gray-400 font-normal">(ไม่บังคับ เช่น รูปเอกสาร)</span></label>
+            <input id="item-image-file" type="file" accept="image/*" class="hidden" />
+            <div id="image-empty">
+              <button type="button" id="btn-pick-image"
+                class="w-full flex items-center justify-center gap-2 py-3 rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:bg-gray-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="text-sm">เลือก / ถ่ายรูป</span>
+              </button>
+            </div>
+            <div id="image-preview-wrap" class="hidden relative">
+              <img id="image-preview" class="w-full max-h-48 object-cover rounded-lg border border-gray-200" alt="ตัวอย่างรูป" />
+              <button type="button" id="btn-remove-image"
+                class="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80" aria-label="ลบรูป">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
           <div class="flex gap-2 pt-2">
             <button type="button" id="modal-cancel"
               class="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50">ยกเลิก</button>
@@ -200,6 +286,16 @@
         </form>
       </div>
     </div>
+  </div>
+
+  <!-- ===================== LIGHTBOX (ดูรูปเต็มจอ) ===================== -->
+  <div id="lightbox" class="hidden fixed inset-0 z-40 bg-black/90 flex items-center justify-center p-4" aria-label="ดูรูป">
+    <img id="lightbox-img" class="max-w-full max-h-full rounded-lg" alt="รูปเต็ม" />
+    <button id="lightbox-close" class="absolute top-4 right-4 text-white bg-white/10 hover:bg-white/20 rounded-full p-2" aria-label="ปิด">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
   </div>
 
   <script>
@@ -329,14 +425,16 @@
       async add(item) {
         const payload = {
           name: item.name, category: item.category, date: item.date,
-          repeat: item.repeat || 'none', createdAt: new Date().toISOString(),
+          repeat: item.repeat || 'none', note: item.note || '', image: item.image || '',
+          createdAt: new Date().toISOString(),
         };
         const ref = await addDoc(col(), payload);
         return { id: ref.id, ...payload };
       },
       async update(id, data) {
         await updateDoc(doc(db, 'items', id), {
-          name: data.name, category: data.category, date: data.date, repeat: data.repeat || 'none',
+          name: data.name, category: data.category, date: data.date,
+          repeat: data.repeat || 'none', note: data.note || '', image: data.image || '',
         });
       },
       async remove(id) {
@@ -459,6 +557,7 @@
     statSafe: document.getElementById('stat-safe'),
     search: document.getElementById('search-input'),
     filterBar: document.getElementById('filter-bar'),
+    group: document.getElementById('group-select'),
   };
 
   // State กลางของแอป
@@ -466,6 +565,7 @@
     items: [],              // ข้อมูลทั้งหมด (cache ในหน่วยความจำ)
     search: '',             // คำค้นหา
     filter: 'all',          // หมวดหมู่ที่เลือก: all | vehicle | ...
+    group: 'none',          // การจัดกลุ่ม: none | status | category
   };
 
   // โหลดข้อมูลจาก backend (ยิง fetch จริงเฉพาะตอนนี้)
@@ -504,11 +604,13 @@
     els.statWarning.textContent = w;
     els.statSafe.textContent = s;
 
-    // กรอง + ค้นหา
+    // กรอง + ค้นหา (ค้นทั้งชื่อและโน้ต)
     const keyword = state.search.trim().toLowerCase();
     let items = state.items.filter(i => {
       const matchCat = state.filter === 'all' || i.category === state.filter;
-      const matchKw = !keyword || (i.name || '').toLowerCase().includes(keyword);
+      const matchKw = !keyword ||
+        (i.name || '').toLowerCase().includes(keyword) ||
+        (i.note || '').toLowerCase().includes(keyword);
       return matchCat && matchKw;
     });
 
@@ -523,7 +625,38 @@
         isFiltering ? 'ไม่พบรายการที่ค้นหา' : 'ยังไม่มีรายการ';
     }
 
-    els.list.innerHTML = items.map(renderCard).join('');
+    // วาดผล: แบบจัดกลุ่ม หรือ รายการเรียงปกติ
+    if (state.group === 'none' || items.length === 0) {
+      els.list.innerHTML = items.map(renderCard).join('');
+    } else {
+      els.list.innerHTML = groupItems(items).map(g => `
+        <div class="pt-1">
+          <div class="flex items-center gap-2 mb-2 px-1">
+            <span class="text-sm font-semibold text-gray-600">${g.label}</span>
+            <span class="text-xs text-gray-400">(${g.items.length})</span>
+            <span class="flex-1 border-t border-gray-200"></span>
+          </div>
+          <div class="space-y-3">${g.items.map(renderCard).join('')}</div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // จัดกลุ่มรายการตาม state.group -> [{label, items}]
+  function groupItems(items) {
+    if (state.group === 'status') {
+      const buckets = { critical: [], warning: [], safe: [] };
+      items.forEach(i => buckets[getStatus(i.date)].push(i));
+      return [
+        { key: 'critical', label: '🔴 ด่วน / หมดอายุ', items: buckets.critical },
+        { key: 'warning',  label: '🟡 ใกล้หมดอายุ',    items: buckets.warning },
+        { key: 'safe',     label: '🟢 ปกติ',           items: buckets.safe },
+      ].filter(g => g.items.length > 0);
+    }
+    // group === 'category'
+    return Object.entries(CATEGORIES).map(([key, c]) => ({
+      key, label: `${c.icon} ${c.label}`, items: items.filter(i => i.category === key),
+    })).filter(g => g.items.length > 0);
   }
 
   // วาดปุ่มกรองหมวดหมู่
@@ -584,6 +717,18 @@
             </svg>
             <span>${formatDate(item.date)}</span>
           </div>
+
+          ${item.note ? `
+          <div class="flex items-start gap-1.5 mt-1.5 text-xs text-gray-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+            <span class="line-clamp-2">${escapeHtml(item.note)}</span>
+          </div>` : ''}
+
+          ${item.image ? `
+          <img src="${item.image}" alt="รูปแนบ" onclick="openImage('${item.id}')"
+            class="mt-2 w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer" />` : ''}
         </div>
 
         <div class="flex flex-col gap-1 shrink-0">
@@ -620,6 +765,8 @@
     fCategory: document.getElementById('item-category'),
     fDate: document.getElementById('item-date'),
     fRepeat: document.getElementById('item-repeat'),
+    fNote: document.getElementById('item-note'),
+    currentImage: '', // เก็บ data URL ของรูปที่เลือก/มีอยู่
 
     open(item = null) {
       if (item) {
@@ -629,16 +776,28 @@
         this.fCategory.value = item.category;
         this.fDate.value = item.date;
         this.fRepeat.checked = item.repeat === 'yearly';
+        this.fNote.value = item.note || '';
+        this.setImage(item.image || '');
       } else {
         this.title.textContent = 'เพิ่มรายการใหม่';
         this.form.reset();
         this.fId.value = '';
+        this.setImage('');
       }
       this.el.classList.remove('hidden');
       document.body.classList.add('modal-open');
       // ให้ transition ทำงาน (รอ 1 frame)
       requestAnimationFrame(() => this.el.classList.remove('modal-hidden'));
       setTimeout(() => this.fName.focus(), 150);
+    },
+
+    // ตั้งค่ารูป (data URL) + สลับ UI ระหว่างปุ่มเลือก กับ ตัวอย่างรูป
+    setImage(dataUrl) {
+      this.currentImage = dataUrl || '';
+      const hasImg = !!this.currentImage;
+      document.getElementById('image-empty').classList.toggle('hidden', hasImg);
+      document.getElementById('image-preview-wrap').classList.toggle('hidden', !hasImg);
+      if (hasImg) document.getElementById('image-preview').src = this.currentImage;
     },
 
     close() {
@@ -684,6 +843,8 @@
       category: modal.fCategory.value,
       date: modal.fDate.value,
       repeat: modal.fRepeat.checked ? 'yearly' : 'none',
+      note: modal.fNote.value.trim(),
+      image: modal.currentImage || '',
     };
     if (!data.name || !data.date) return;
 
@@ -727,6 +888,83 @@
     render();
   });
 
+  // จัดกลุ่ม
+  els.group.addEventListener('change', (e) => {
+    state.group = e.target.value;
+    render();
+  });
+
+  /* =========================================================
+     แนบรูป: เลือกไฟล์ -> ย่อขนาด + บีบอัดเป็น data URL (เก็บใน DB ได้เลย)
+     ========================================================= */
+  const imageFile = document.getElementById('item-image-file');
+  document.getElementById('btn-pick-image').addEventListener('click', () => imageFile.click());
+  document.getElementById('btn-remove-image').addEventListener('click', () => modal.setImage(''));
+  imageFile.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImage(file, 1000, 0.7);
+      modal.setImage(dataUrl);
+    } catch (err) {
+      alert('ใช้รูปนี้ไม่ได้: ' + (err.message || err));
+    } finally {
+      imageFile.value = '';
+    }
+  });
+
+  // ย่อรูปด้วย canvas ให้ด้านยาวสุดไม่เกิน maxSize px แล้ว export เป็น JPEG
+  function compressImage(file, maxSize, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('ไฟล์รูปไม่ถูกต้อง'));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxSize) { height = Math.round(height * maxSize / width); width = maxSize; }
+          else if (height > maxSize) { width = Math.round(width * maxSize / height); height = maxSize; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* =========================================================
+     Lightbox: ดูรูปเต็มจอ
+     ========================================================= */
+  const lightbox = document.getElementById('lightbox');
+  window.openImage = function (id) {
+    const item = state.items.find(i => i.id === id);
+    if (!item || !item.image) return;
+    document.getElementById('lightbox-img').src = item.image;
+    lightbox.classList.remove('hidden');
+  };
+  function closeLightbox() { lightbox.classList.add('hidden'); }
+  document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+  lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+
+  /* =========================================================
+     สลับโหมดมืด/สว่าง (บันทึกค่าไว้)
+     ========================================================= */
+  function applyThemeIcon() {
+    const dark = document.documentElement.classList.contains('dark');
+    document.getElementById('icon-moon').classList.toggle('hidden', dark);
+    document.getElementById('icon-sun').classList.toggle('hidden', !dark);
+  }
+  document.getElementById('btn-theme').addEventListener('click', () => {
+    const dark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+    applyThemeIcon();
+  });
+  applyThemeIcon();
+
   /* =========================================================
      สำรอง / นำเข้าข้อมูล (Export / Import JSON)
      ========================================================= */
@@ -738,6 +976,7 @@
       exportedAt: new Date().toISOString(),
       items: state.items.map(i => ({
         name: i.name, category: i.category, date: i.date, repeat: i.repeat || 'none',
+        note: i.note || '', image: i.image || '',
       })),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -770,6 +1009,8 @@
           category: CATEGORIES[i.category] ? i.category : 'appointment',
           date: String(i.date),
           repeat: i.repeat === 'yearly' ? 'yearly' : 'none',
+          note: i.note ? String(i.note) : '',
+          image: typeof i.image === 'string' ? i.image : '',
         });
       }
       await loadData();

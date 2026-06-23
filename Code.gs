@@ -15,13 +15,18 @@
  *        C1: category
  *        D1: date
  *        E1: repeat
- *        F1: createdAt
+ *        F1: note
+ *        G1: image
+ *        H1: createdAt
  *
  *     หมายเหตุ:
  *       - date เก็บรูปแบบข้อความ YYYY-MM-DD (แนะนำให้ตั้ง format
  *         คอลัมน์ D เป็น "Plain text" กันไม่ให้ Sheets แปลงเป็น Date)
  *       - category ใช้ค่า: vehicle | document | service | appointment
  *       - repeat ใช้ค่า: none (ไม่ทำซ้ำ) | yearly (ทำซ้ำทุกปี)
+ *       - note: ข้อความโน้ต (ไม่บังคับ)
+ *       - image: รูปแบบ data URL (base64). หมายเหตุ: เซลล์ Google Sheets
+ *         จำกัด ~50,000 ตัวอักษร ถ้ารูปใหญ่อาจเกิน — โหมด Firebase ไม่มีปัญหานี้
  *
  *  4. เมนู Extensions > Apps Script  แล้ววางโค้ดไฟล์นี้ทับ Code.gs
  *  5. กด Deploy > New deployment
@@ -36,7 +41,7 @@
  */
 
 var SHEET_NAME = 'Data';
-var HEADERS = ['id', 'name', 'category', 'date', 'repeat', 'createdAt'];
+var HEADERS = ['id', 'name', 'category', 'date', 'repeat', 'note', 'image', 'createdAt'];
 
 /* -----------------------------------------------------------
  *  GET  -> ใช้สำหรับ "อ่านข้อมูลทั้งหมด"  (action=list)
@@ -106,7 +111,9 @@ function getAllItems() {
         category:  String(r[2]),
         date:      normalizeDate(r[3]),
         repeat:    r[4] ? String(r[4]) : 'none',
-        createdAt: r[5] ? String(r[5]) : '',
+        note:      r[5] ? String(r[5]) : '',
+        image:     r[6] ? String(r[6]) : '',
+        createdAt: r[7] ? String(r[7]) : '',
       };
     });
 }
@@ -119,9 +126,12 @@ function addItem(item) {
     category: item.category || '',
     date: item.date || '',
     repeat: item.repeat || 'none',
+    note: item.note || '',
+    image: item.image || '',
     createdAt: new Date().toISOString(),
   };
-  sheet.appendRow([record.id, record.name, record.category, record.date, record.repeat, record.createdAt]);
+  sheet.appendRow([record.id, record.name, record.category, record.date,
+                   record.repeat, record.note, record.image, record.createdAt]);
   return record;
 }
 
@@ -130,16 +140,19 @@ function updateItem(id, data) {
   var rowIndex = findRowById(sheet, id);
   if (rowIndex === -1) throw new Error('ไม่พบรายการ id: ' + id);
 
-  // อัปเดตเฉพาะ name, category, date, repeat (คอลัมน์ B, C, D, E)
+  // อัปเดต name, category, date, repeat, note, image (คอลัมน์ B–G)
   sheet.getRange(rowIndex, 2).setValue(data.name);
   sheet.getRange(rowIndex, 3).setValue(data.category);
   sheet.getRange(rowIndex, 4).setValue(data.date);
   sheet.getRange(rowIndex, 5).setValue(data.repeat || 'none');
+  sheet.getRange(rowIndex, 6).setValue(data.note || '');
+  sheet.getRange(rowIndex, 7).setValue(data.image || '');
 
   var row = sheet.getRange(rowIndex, 1, 1, HEADERS.length).getValues()[0];
   return {
     id: String(row[0]), name: String(row[1]), category: String(row[2]),
-    date: normalizeDate(row[3]), repeat: String(row[4]), createdAt: String(row[5]),
+    date: normalizeDate(row[3]), repeat: String(row[4]),
+    note: String(row[5]), image: String(row[6]), createdAt: String(row[7]),
   };
 }
 
