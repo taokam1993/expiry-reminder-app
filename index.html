@@ -249,14 +249,13 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-sm font-medium text-gray-700">หมวดหมู่</label>
+              <button type="button" id="btn-manage-cat" class="text-xs text-blue-600 hover:underline">⚙️ จัดการหมวดหมู่</button>
+            </div>
             <select id="item-category"
               class="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-              <option value="vehicle">🚗 ยานพาหนะ</option>
-              <option value="document">📄 เอกสารส่วนตัว</option>
-              <option value="service">📱 บริการ / แอป</option>
-              <option value="device">🔧 อุปกรณ์</option>
-              <option value="appointment">📅 นัดหมายทั่วไป</option>
+              <!-- ตัวเลือกถูกสร้างด้วย JS (renderCategoryOptions) -->
             </select>
           </div>
 
@@ -264,6 +263,21 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">วันที่กำหนด</label>
             <input id="item-date" type="date" required
               class="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">⏰ เตือนล่วงหน้า</label>
+            <select id="item-lead"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+              <option value="1">1 วัน</option>
+              <option value="3">3 วัน</option>
+              <option value="7" selected>7 วัน</option>
+              <option value="14">14 วัน</option>
+              <option value="30">30 วัน (1 เดือน)</option>
+              <option value="60">60 วัน (2 เดือน)</option>
+              <option value="90">90 วัน (3 เดือน)</option>
+            </select>
+            <span class="block text-xs text-gray-400 mt-1">LINE จะเริ่มเตือนล่วงหน้ากี่วันก่อนถึงกำหนด</span>
           </div>
 
           <!-- แจ้งเตือนซ้ำรายปี -->
@@ -328,17 +342,47 @@
     </button>
   </div>
 
+  <!-- ===================== MODAL จัดการหมวดหมู่ ===================== -->
+  <div id="cat-modal" class="modal-hidden hidden fixed inset-0 z-40">
+    <div id="cat-backdrop" class="modal-backdrop absolute inset-0 bg-black/40"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div class="modal-panel bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[85vh] flex flex-col">
+        <div class="px-5 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
+          <h2 class="text-lg font-semibold">จัดการหมวดหมู่</h2>
+          <button id="cat-close" class="text-gray-400 hover:text-gray-600 p-1" aria-label="ปิด">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="px-5 py-4 overflow-y-auto">
+          <div id="cat-list" class="space-y-2 mb-4"></div>
+          <div class="border-t border-gray-100 pt-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">เพิ่มหมวดหมู่ใหม่</label>
+            <div class="flex gap-2">
+              <input id="cat-icon" type="text" maxlength="2" placeholder="🎯" class="w-14 text-center rounded-lg border border-gray-300 px-2 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+              <input id="cat-label" type="text" placeholder="ชื่อหมวดหมู่ เช่น สุขภาพ" class="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+              <button id="cat-add" type="button" class="px-4 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700">เพิ่ม</button>
+            </div>
+            <span class="block text-xs text-gray-400 mt-1">ช่องแรกใส่อิโมจิ (ไอคอน), ช่องที่สองใส่ชื่อ</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
   /* =========================================================
      CONFIG: ข้อมูลหมวดหมู่ (ไอคอน + ชื่อภาษาไทย)
      ========================================================= */
-  const CATEGORIES = {
+  // หมวดหมู่มาตรฐาน (ลบไม่ได้)
+  const BUILTIN_CATEGORIES = {
     vehicle:     { label: 'ยานพาหนะ',       icon: '🚗' },
     document:    { label: 'เอกสารส่วนตัว',   icon: '📄' },
     service:     { label: 'บริการ / แอป',    icon: '📱' },
     device:      { label: 'อุปกรณ์',         icon: '🔧' },
     appointment: { label: 'นัดหมายทั่วไป',   icon: '📅' },
   };
+  // หมวดหมู่ที่ใช้งานจริง = มาตรฐาน + ที่ผู้ใช้เพิ่มเอง (โหลดจาก Store ตอน init)
+  const CATEGORIES = { ...BUILTIN_CATEGORIES };
 
   /* เทมเพลตเพิ่มด่วน — กดแล้วเติมชื่อ/หมวด/ทำซ้ำให้อัตโนมัติ (ผู้ใช้เลือกวันที่เอง) */
   const QUICK_TEMPLATES = [
@@ -419,6 +463,17 @@
       items = items.filter(i => i.id !== id);
       await this._saveAll(items);
     },
+    async getMeta(key) {
+      const raw = localStorage.getItem('reminder_meta');
+      const meta = raw ? JSON.parse(raw) : {};
+      return meta[key];
+    },
+    async setMeta(key, value) {
+      const raw = localStorage.getItem('reminder_meta');
+      const meta = raw ? JSON.parse(raw) : {};
+      meta[key] = value;
+      localStorage.setItem('reminder_meta', JSON.stringify(meta));
+    },
   };
 
   // --- โหมด Google Apps Script ---
@@ -443,6 +498,8 @@
     async add(item)        { return this._post('add', item); },
     async update(id, data) { return this._post('update', { ...data, id }); },
     async remove(id)       { return this._post('delete', { id }); },
+    async getMeta()        { return undefined; }, // GAS ยังไม่รองรับ meta
+    async setMeta()        { /* no-op */ },
   };
 
   // --- โหมด Firebase (Cloud Firestore) ---
@@ -451,7 +508,7 @@
     const V = '10.12.0';
     const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
     const { getAuth, signInAnonymously } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
-    const { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc } =
+    const { getFirestore, collection, getDocs, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc } =
       await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
 
     const app = initializeApp(firebaseConfig);
@@ -468,7 +525,7 @@
         const payload = {
           name: item.name, category: item.category, date: item.date,
           repeat: item.repeat || 'none', note: item.note || '', image: item.image || '',
-          done: item.done || false, doneAt: item.doneAt || '',
+          leadDays: item.leadDays || 7, done: item.done || false, doneAt: item.doneAt || '',
           createdAt: new Date().toISOString(),
         };
         const ref = await addDoc(col(), payload);
@@ -476,13 +533,21 @@
       },
       async update(id, data) {
         // อัปเดตเฉพาะ field ที่ส่งมา (รองรับการอัปเดตบางส่วน เช่น mark as done)
-        const allowed = ['name','category','date','repeat','note','image','done','doneAt'];
+        const allowed = ['name','category','date','repeat','note','image','leadDays','done','doneAt'];
         const payload = {};
         allowed.forEach(k => { if (data[k] !== undefined) payload[k] = data[k]; });
         await updateDoc(doc(db, 'items', id), payload);
       },
       async remove(id) {
         await deleteDoc(doc(db, 'items', id));
+      },
+      // เก็บค่า config ส่วนกลาง (เช่น หมวดหมู่ที่ผู้ใช้เพิ่มเอง) ที่ doc: meta/app
+      async getMeta(key) {
+        const snap = await getDoc(doc(db, 'meta', 'app'));
+        return snap.exists() ? snap.data()[key] : undefined;
+      },
+      async setMeta(key, value) {
+        await setDoc(doc(db, 'meta', 'app'), { [key]: value }, { merge: true });
       },
     };
   }
@@ -849,10 +914,12 @@
     fDate: document.getElementById('item-date'),
     fRepeat: document.getElementById('item-repeat'),
     fNote: document.getElementById('item-note'),
+    fLead: document.getElementById('item-lead'),
     currentImage: '', // เก็บ data URL ของรูปที่เลือก/มีอยู่
 
     open(item = null) {
       const quickWrap = document.getElementById('quick-templates-wrap');
+      renderCategoryOptions(); // อัปเดตตัวเลือกหมวดหมู่ (เผื่อมีเพิ่มใหม่)
       if (item) {
         this.title.textContent = 'แก้ไขรายการ';
         this.fId.value = item.id;
@@ -861,12 +928,14 @@
         this.fDate.value = item.date;
         this.fRepeat.checked = item.repeat === 'yearly';
         this.fNote.value = item.note || '';
+        this.fLead.value = String(item.leadDays || 7);
         this.setImage(item.image || '');
         quickWrap.classList.add('hidden'); // ซ่อนเทมเพลตตอนแก้ไข
       } else {
         this.title.textContent = 'เพิ่มรายการใหม่';
         this.form.reset();
         this.fId.value = '';
+        this.fLead.value = '7';
         this.setImage('');
         quickWrap.classList.remove('hidden');
         renderQuickTemplates();
@@ -925,7 +994,7 @@
         name: item.name, category: item.category,
         date: nextYearlyDate(addYears(item.date, 1)),
         repeat: 'yearly', note: item.note || '', image: item.image || '',
-        done: false, doneAt: '',
+        leadDays: item.leadDays || 7, done: false, doneAt: '',
       });
     }
     await loadData();
@@ -958,6 +1027,82 @@
   }
 
   /* =========================================================
+     หมวดหมู่ที่ปรับแต่งเองได้ (custom categories)
+     ========================================================= */
+  // โหลดหมวดหมู่ที่ผู้ใช้เพิ่มไว้ จาก Store แล้วรวมเข้ากับหมวดมาตรฐาน
+  async function loadCustomCategories() {
+    let custom = {};
+    try { custom = (await Store.getMeta('categories')) || {}; } catch (e) { /* ใช้ค่ามาตรฐาน */ }
+    // ล้าง custom เดิมออกก่อน (เหลือเฉพาะ built-in) แล้วเติมใหม่
+    Object.keys(CATEGORIES).forEach(k => { if (!BUILTIN_CATEGORIES[k]) delete CATEGORIES[k]; });
+    Object.assign(CATEGORIES, custom);
+  }
+
+  // เติมตัวเลือกหมวดหมู่ลงใน <select> ของฟอร์ม
+  function renderCategoryOptions() {
+    const sel = document.getElementById('item-category');
+    const current = sel.value;
+    sel.innerHTML = Object.entries(CATEGORIES)
+      .map(([key, c]) => `<option value="${key}">${c.icon} ${escapeHtml(c.label)}</option>`).join('');
+    if (current && CATEGORIES[current]) sel.value = current;
+  }
+
+  // ----- โมดัลจัดการหมวดหมู่ -----
+  const catModal = {
+    el: document.getElementById('cat-modal'),
+    open() {
+      renderCatList();
+      this.el.classList.remove('hidden');
+      document.body.classList.add('modal-open');
+      requestAnimationFrame(() => this.el.classList.remove('modal-hidden'));
+    },
+    close() {
+      this.el.classList.add('modal-hidden');
+      document.body.classList.remove('modal-open');
+      setTimeout(() => this.el.classList.add('hidden'), 200);
+    },
+  };
+
+  function renderCatList() {
+    const box = document.getElementById('cat-list');
+    box.innerHTML = Object.entries(CATEGORIES).map(([key, c]) => {
+      const builtin = !!BUILTIN_CATEGORIES[key];
+      return `<div class="flex items-center gap-2 p-2 rounded-lg border border-gray-200">
+        <span class="text-xl">${c.icon}</span>
+        <span class="flex-1 text-sm text-gray-700">${escapeHtml(c.label)}</span>
+        ${builtin
+          ? '<span class="text-[10px] text-gray-400">มาตรฐาน</span>'
+          : `<button data-del-cat="${key}" class="text-xs text-red-500 hover:text-red-700 px-2 py-1">ลบ</button>`}
+      </div>`;
+    }).join('');
+  }
+
+  async function addCustomCategory(icon, label) {
+    icon = (icon || '').trim() || '🏷️';
+    label = (label || '').trim();
+    if (!label) { alert('กรุณาใส่ชื่อหมวดหมู่'); return; }
+    const key = 'c_' + Date.now().toString(36);
+    const custom = (await Store.getMeta('categories')) || {};
+    custom[key] = { label, icon };
+    await Store.setMeta('categories', custom);
+    await loadCustomCategories();
+    renderCatList(); renderCategoryOptions(); renderFilterBar(); render();
+  }
+
+  async function deleteCustomCategory(key) {
+    const used = state.items.some(i => i.category === key);
+    const msg = used
+      ? 'มีรายการที่ใช้หมวดนี้อยู่ ถ้าลบ รายการเหล่านั้นจะไม่มีหมวด — ลบต่อไหม?'
+      : 'ลบหมวดหมู่นี้?';
+    if (!confirm(msg)) return;
+    const custom = (await Store.getMeta('categories')) || {};
+    delete custom[key];
+    await Store.setMeta('categories', custom);
+    await loadCustomCategories();
+    renderCatList(); renderCategoryOptions(); renderFilterBar(); render();
+  }
+
+  /* =========================================================
      EVENT BINDINGS
      ========================================================= */
   document.getElementById('fab').addEventListener('click', () => modal.open());
@@ -966,6 +1111,20 @@
   document.getElementById('modal-backdrop').addEventListener('click', () => modal.close());
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !modal.el.classList.contains('hidden')) modal.close();
+  });
+
+  // จัดการหมวดหมู่
+  document.getElementById('btn-manage-cat').addEventListener('click', () => catModal.open());
+  document.getElementById('cat-close').addEventListener('click', () => catModal.close());
+  document.getElementById('cat-backdrop').addEventListener('click', () => catModal.close());
+  document.getElementById('cat-add').addEventListener('click', () => {
+    addCustomCategory(document.getElementById('cat-icon').value, document.getElementById('cat-label').value);
+    document.getElementById('cat-icon').value = '';
+    document.getElementById('cat-label').value = '';
+  });
+  document.getElementById('cat-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-del-cat]');
+    if (btn) deleteCustomCategory(btn.dataset.delCat);
   });
 
   modal.form.addEventListener('submit', async (e) => {
@@ -977,6 +1136,7 @@
       repeat: modal.fRepeat.checked ? 'yearly' : 'none',
       note: modal.fNote.value.trim(),
       image: modal.currentImage || '',
+      leadDays: parseInt(modal.fLead.value, 10) || 7,
     };
     if (!data.name || !data.date) return;
 
@@ -1143,7 +1303,8 @@
       exportedAt: new Date().toISOString(),
       items: state.items.map(i => ({
         name: i.name, category: i.category, date: i.date, repeat: i.repeat || 'none',
-        note: i.note || '', image: i.image || '', done: !!i.done, doneAt: i.doneAt || '',
+        note: i.note || '', image: i.image || '', leadDays: i.leadDays || 7,
+        done: !!i.done, doneAt: i.doneAt || '',
       })),
     };
     downloadFile(JSON.stringify(payload, null, 2),
@@ -1157,13 +1318,13 @@
       const s = String(v == null ? '' : v);
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
-    const headers = ['ชื่อรายการ', 'หมวดหมู่', 'วันที่กำหนด', 'ทำซ้ำทุกปี', 'จำนวนวันคงเหลือ', 'สถานะ', 'โน้ต'];
+    const headers = ['ชื่อรายการ', 'หมวดหมู่', 'วันที่กำหนด', 'ทำซ้ำทุกปี', 'เตือนล่วงหน้า(วัน)', 'จำนวนวันคงเหลือ', 'สถานะ', 'โน้ต'];
     const rows = state.items.map(i => {
       const cat = (CATEGORIES[i.category] || {}).label || i.category;
       const repeat = i.repeat === 'yearly' ? 'ใช่' : 'ไม่';
       const status = i.done ? `เสร็จแล้ว (${i.doneAt || ''})` : daysLeftText(i.date);
       const left = i.done ? '' : daysLeft(i.date);
-      return [i.name, cat, formatDate(i.date), repeat, left, status, i.note || ''].map(esc).join(',');
+      return [i.name, cat, formatDate(i.date), repeat, i.leadDays || 7, left, status, i.note || ''].map(esc).join(',');
     });
     // ใส่ BOM (U+FEFF) เพื่อให้ Excel อ่านภาษาไทยถูก
     const BOM = String.fromCharCode(0xFEFF);
@@ -1194,6 +1355,7 @@
           repeat: i.repeat === 'yearly' ? 'yearly' : 'none',
           note: i.note ? String(i.note) : '',
           image: typeof i.image === 'string' ? i.image : '',
+          leadDays: parseInt(i.leadDays, 10) || 7,
           done: !!i.done,
           doneAt: i.doneAt ? String(i.doneAt) : '',
         });
@@ -1224,6 +1386,11 @@
       return;
     }
     updateSyncBadge();
+
+    // โหลดหมวดหมู่ที่ผู้ใช้เพิ่มเอง แล้วอัปเดต UI ที่เกี่ยวข้อง
+    await loadCustomCategories();
+    renderCategoryOptions();
+    renderFilterBar();
 
     // ใส่ข้อมูลตัวอย่างครั้งแรก เฉพาะโหมด localStorage เท่านั้น
     // (โหมด Firebase/GAS จะไม่ seed เพื่อไม่ให้เขียนข้อมูลตัวอย่างลงฐานข้อมูลจริง)

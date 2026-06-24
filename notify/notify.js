@@ -80,6 +80,7 @@ async function fetchItems(idToken) {
       date: get('date') || '',
       category: get('category') || '',
       repeat: get('repeat') || 'none',
+      leadDays: get('leadDays'),
       done: get('done') === true,
     };
   });
@@ -168,10 +169,12 @@ function buildFlex(due, today) {
   const idToken = await getIdToken();
   const items = await fetchItems(idToken);
 
-  // หาเฉพาะที่ยังไม่ทำเสร็จ และใกล้ครบกำหนด/เลยกำหนด
+  // หาเฉพาะที่ยังไม่ทำเสร็จ และถึงช่วงเตือนล่วงหน้าของรายการนั้น (หรือเลยกำหนด)
+  // ใช้ leadDays รายรายการ ถ้าไม่มีให้ใช้ค่าเริ่มต้น THRESHOLD_DAYS
   const due = items
-    .filter(i => i.date && !i.done && daysLeft(i.date, today) <= THRESHOLD_DAYS)
-    .map(i => ({ ...i, d: daysLeft(i.date, today) }))
+    .filter(i => i.date && !i.done)
+    .map(i => ({ ...i, d: daysLeft(i.date, today), lead: i.leadDays || THRESHOLD_DAYS }))
+    .filter(i => i.d <= i.lead)
     .sort((a, b) => a.d - b.d);
 
   if (due.length === 0) {
