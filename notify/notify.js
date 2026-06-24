@@ -2,24 +2,23 @@
  * ===========================================================
  *  แจ้งเตือน LINE — รันโดย GitHub Actions ทุกเช้า
  * ===========================================================
- *  อ่านรายการจาก Cloud Firestore (ผ่าน REST + anonymous auth)
+ *  อ่านรายการส่วนตัวจาก Cloud Firestore (users/{OWNER_UID}/items)
+ *  ผ่าน Firebase Admin SDK (service account — ข้าม security rules ได้)
  *  หา "รายการที่ใกล้ครบกำหนด/เลยกำหนด" แล้วส่งข้อความเข้า LINE
  *
- *  ไม่ต้องใช้ service account — ใช้ Web API key (public) ขอ idToken
- *  แบบ anonymous แล้วอ่าน Firestore (security rules อนุญาต auth != null)
- *
  *  ต้องตั้ง GitHub Secret:
+ *    - FIREBASE_SERVICE_ACCOUNT   (JSON ของ service account — จำเป็น)
+ *    - OWNER_UID                  (UID ของเจ้าของข้อมูล — จำเป็น)
  *    - LINE_CHANNEL_ACCESS_TOKEN  (จำเป็น)
  *    - LINE_TARGET_USER_ID        (ไม่ใส่ก็ได้ -> ใช้ broadcast แทน push)
  *  ปรับได้ผ่าน env:
- *    - NOTIFY_THRESHOLD_DAYS      (ค่าเริ่มต้น 7 = เตือนล่วงหน้า 7 วัน)
+ *    - NOTIFY_THRESHOLD_DAYS      (ค่าเริ่มต้น 7 = เตือนล่วงหน้าถ้ารายการไม่ได้ตั้ง leadDays)
  * ===========================================================
  */
 
-// ---- ค่าคงที่ของโปรเจกต์ (เป็นข้อมูล public ของ Firebase web app) ----
-const FIREBASE_API_KEY = 'AIzaSyB3dVyD8dQ5sdJ4XvmpNcXIrCPnRNk5FOU';
-const FIREBASE_PROJECT_ID = 'reminder-app-5e30a';
+const admin = require('firebase-admin');
 
+const OWNER_UID = process.env.OWNER_UID;
 const LINE_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 const LINE_USER_ID = process.env.LINE_TARGET_USER_ID || '';
 const THRESHOLD_DAYS = parseInt(process.env.NOTIFY_THRESHOLD_DAYS || '7', 10);
@@ -46,42 +45,27 @@ function leftText(d) {
   return `เหลือ ${d} วัน`;
 }
 
-// ---------- 1) ขอ idToken แบบ anonymous ----------
-async function getIdToken() {
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ returnSecureToken: true }) }
-  );
-  const data = await res.json();
-  if (!data.idToken) throw new Error('ขอ idToken ไม่สำเร็จ: ' + JSON.stringify(data));
-  return data.idToken;
+// ---------- เริ่ม Firebase Admin จาก service account ----------
+function initAdmin() {
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) throw new Error('ยังไม่ได้ตั้งค่า FIREBASE_SERVICE_ACCOUNT');
+  if (!OWNER_UID) throw new Error('ยังไม่ได้ตั้งค่า OWNER_UID');
+  const cred = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({ credential: admin.credential.cert(cred) });
+  return admin.firestore();
 }
 
-// ---------- 2) อ่าน collection "items" ผ่าน Firestore REST ----------
-async function fetchItems(idToken) {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/items?pageSize=300`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
-  const data = await res.json();
-  if (data.error) throw new Error('อ่าน Firestore ไม่สำเร็จ: ' + JSON.stringify(data.error));
-  const docs = data.documents || [];
-  return docs.map(doc => {
-    const f = doc.fields || {};
-    const get = (k) => {
-      const v = f[k];
-      if (!v) return undefined;
-      if ('stringValue' in v) return v.stringValue;
-      if ('booleanValue' in v) return v.booleanValue;
-      if ('integerValue' in v) return Number(v.integerValue);
-      return undefined;
-    };
+// ---------- อ่านรายการส่วนตัวของเจ้าของ users/{OWNER_UID}/items ----------
+async function fetchItems(db) {
+  const snap = await db.collection('users').doc(OWNER_UID).collection('items').get();
+  return snap.docs.map(doc => {
+    const d = doc.data() || {};
     return {
-      name: get('name') || '(ไม่มีชื่อ)',
-      date: get('date') || '',
-      category: get('category') || '',
-      repeat: get('repeat') || 'none',
-      leadDays: get('leadDays'),
-      done: get('done') === true,
+      name: d.name || '(ไม่มีชื่อ)',
+      date: d.date || '',
+      category: d.category || '',
+      repeat: d.repeat || 'none',
+      leadDays: typeof d.leadDays === 'number' ? d.leadDays : undefined,
+      done: d.done === true,
     };
   });
 }
@@ -166,8 +150,8 @@ function buildFlex(due, today) {
   if (!LINE_TOKEN) throw new Error('ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN');
 
   const today = todayBangkok();
-  const idToken = await getIdToken();
-  const items = await fetchItems(idToken);
+  const db = initAdmin();
+  const items = await fetchItems(db);
 
   // หาเฉพาะที่ยังไม่ทำเสร็จ และถึงช่วงเตือนล่วงหน้าของรายการนั้น (หรือเลยกำหนด)
   // ใช้ leadDays รายรายการ ถ้าไม่มีให้ใช้ค่าเริ่มต้น THRESHOLD_DAYS
