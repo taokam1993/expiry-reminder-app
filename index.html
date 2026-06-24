@@ -110,13 +110,30 @@
       <div class="flex items-center gap-2 mb-3">
         <span class="text-2xl">🔔</span>
         <h1 class="text-lg font-semibold text-gray-800 flex-1">ระบบแจ้งเตือนวันหมดอายุ</h1>
-        <!-- ออกจากระบบ (แสดงเมื่อล็อกอินแล้ว) -->
-        <button id="btn-logout" title="ออกจากระบบ"
-          class="hidden p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" aria-label="ออกจากระบบ">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-        </button>
+        <!-- โปรไฟล์ผู้ใช้ (แสดงเมื่อล็อกอินแล้ว) -->
+        <div id="profile-wrap" class="hidden relative">
+          <button id="btn-profile" class="block rounded-full focus:ring-2 focus:ring-blue-500 outline-none" aria-label="โปรไฟล์">
+            <img id="profile-avatar" referrerpolicy="no-referrer"
+              class="w-8 h-8 rounded-full border border-gray-200 object-cover bg-gray-100" alt="โปรไฟล์" />
+          </button>
+          <div id="profile-menu" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 z-40 overflow-hidden">
+            <div class="p-4 flex items-center gap-3 border-b border-gray-100">
+              <img id="profile-avatar-lg" referrerpolicy="no-referrer"
+                class="w-12 h-12 rounded-full object-cover bg-gray-100 shrink-0" alt="" />
+              <div class="min-w-0">
+                <div id="profile-name" class="font-medium text-gray-800 truncate text-sm">—</div>
+                <div id="profile-email" class="text-xs text-gray-400 truncate">—</div>
+              </div>
+            </div>
+            <div id="profile-stats" class="px-4 py-2.5 text-xs text-gray-500 border-b border-gray-100"></div>
+            <button id="btn-logout" class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              ออกจากระบบ
+            </button>
+          </div>
+        </div>
         <!-- สลับโหมดมืด/สว่าง -->
         <button id="btn-theme" title="สลับโหมดมืด/สว่าง"
           class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="สลับธีม">
@@ -1508,10 +1525,11 @@
       // ติดตามสถานะล็อกอิน
       _fb.authMod.onAuthStateChanged(_fb.auth, async (user) => {
         const loginScreen = document.getElementById('login-screen');
-        const logoutBtn = document.getElementById('btn-logout');
+        const profileWrap = document.getElementById('profile-wrap');
         if (user) {
           loginScreen.classList.add('hidden');
-          logoutBtn.classList.remove('hidden');
+          profileWrap.classList.remove('hidden');
+          setProfile(user);
           Store = makeUserStore(user.uid);
           try {
             showState('loading');
@@ -1523,7 +1541,8 @@
           }
         } else {
           loginScreen.classList.remove('hidden');
-          logoutBtn.classList.add('hidden');
+          profileWrap.classList.add('hidden');
+          document.getElementById('profile-menu').classList.add('hidden');
         }
       });
       return; // ที่เหลือทำงานใน listener
@@ -1578,6 +1597,49 @@
     if (!_fb) return;
     const ok = await confirmDialog({ title: 'ออกจากระบบ', message: 'ต้องการออกจากระบบใช่ไหม?', okText: 'ออกจากระบบ', danger: true, icon: '👋' });
     if (ok) await _fb.authMod.signOut(_fb.auth);
+  });
+
+  /* =========================================================
+     โปรไฟล์ผู้ใช้ (รูป + ชื่อ + อีเมล + สถิติ)
+     ========================================================= */
+  // รูปสำรองเป็นตัวอักษรแรกของชื่อ (เผื่อไม่มีรูป Google)
+  function initialsAvatar(name) {
+    const ch = (name || '?').trim().charAt(0).toUpperCase() || '?';
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' rx='32' fill='%232563eb'/><text x='32' y='43' font-size='32' fill='white' text-anchor='middle' font-family='sans-serif'>${ch}</text></svg>`;
+    return 'data:image/svg+xml;utf8,' + svg;
+  }
+
+  function setProfile(user) {
+    const fallback = initialsAvatar(user.displayName || user.email);
+    const src = user.photoURL || fallback;
+    ['profile-avatar', 'profile-avatar-lg'].forEach(id => {
+      const img = document.getElementById(id);
+      img.src = src;
+      img.onerror = () => { img.onerror = null; img.src = fallback; }; // รูป Google โหลดไม่ได้ -> ใช้ตัวอักษร
+    });
+    document.getElementById('profile-name').textContent = user.displayName || 'ผู้ใช้';
+    document.getElementById('profile-email').textContent = user.email || '';
+    updateProfileStats();
+  }
+
+  // อัปเดตสถิติในเมนูโปรไฟล์
+  function updateProfileStats() {
+    const el = document.getElementById('profile-stats');
+    if (!el) return;
+    const active = state.items.filter(i => !i.done).length;
+    const done = state.items.filter(i => i.done).length;
+    el.innerHTML = `📋 ${active} รายการ &nbsp;·&nbsp; ✅ ${done} ในประวัติ<br><span class="text-[11px] text-emerald-500">☁️ ซิงค์ข้ามอุปกรณ์</span>`;
+  }
+
+  // เปิด/ปิดเมนูโปรไฟล์
+  const profileMenu = document.getElementById('profile-menu');
+  document.getElementById('btn-profile').addEventListener('click', (e) => {
+    e.stopPropagation();
+    profileMenu.classList.toggle('hidden');
+    updateProfileStats();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#profile-wrap')) profileMenu.classList.add('hidden');
   });
 
   /* =========================================================
