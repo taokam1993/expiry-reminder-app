@@ -85,12 +85,35 @@
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
 
+  <!-- ===================== หน้าจอเข้าสู่ระบบ ===================== -->
+  <div id="login-screen" class="hidden fixed inset-0 z-50 bg-gray-50 flex items-center justify-center p-6">
+    <div class="text-center max-w-xs w-full">
+      <div class="text-6xl mb-4">🔔</div>
+      <h1 class="text-xl font-bold text-gray-800 mb-1">ระบบแจ้งเตือนวันหมดอายุ</h1>
+      <p class="text-gray-500 text-sm mb-6">เข้าสู่ระบบเพื่อใช้ข้อมูลส่วนตัวของคุณ<br>(ซิงค์ข้ามอุปกรณ์ ปลอดภัย เป็นส่วนตัว)</p>
+      <button id="btn-login"
+        class="w-full flex items-center justify-center gap-3 py-3 rounded-lg border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 shadow-sm">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        เข้าสู่ระบบด้วย Google
+      </button>
+      <p id="login-error" class="text-red-500 text-xs mt-3 hidden"></p>
+      <p class="text-gray-400 text-[11px] mt-6">ข้อมูลของคุณจะถูกแยกเป็นส่วนตัว คนอื่นเข้าถึงไม่ได้</p>
+    </div>
+  </div>
+
   <!-- ===================== HEADER / DASHBOARD ===================== -->
   <header class="bg-white shadow-sm sticky top-0 z-20">
     <div class="max-w-2xl mx-auto px-4 py-4">
       <div class="flex items-center gap-2 mb-3">
         <span class="text-2xl">🔔</span>
         <h1 class="text-lg font-semibold text-gray-800 flex-1">ระบบแจ้งเตือนวันหมดอายุ</h1>
+        <!-- ออกจากระบบ (แสดงเมื่อล็อกอินแล้ว) -->
+        <button id="btn-logout" title="ออกจากระบบ"
+          class="hidden p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" aria-label="ออกจากระบบ">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
         <!-- สลับโหมดมืด/สว่าง -->
         <button id="btn-theme" title="สลับโหมดมืด/สว่าง"
           class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="สลับธีม">
@@ -502,20 +525,28 @@
     async setMeta()        { /* no-op */ },
   };
 
-  // --- โหมด Firebase (Cloud Firestore) ---
-  // โหลด SDK แบบ dynamic import จาก CDN เฉพาะตอนที่ตั้งค่า firebaseConfig แล้ว
-  async function createFirebaseStore() {
+  // --- โหมด Firebase (Cloud Firestore + Google Login) ---
+  let _fb = null;        // เก็บ handle ของ Firebase (app, auth, db, ฟังก์ชัน)
+  let Store;             // backend ที่ใช้งานอยู่
+  let SYNC_MODE = 'local';
+
+  // โหลด SDK + init app/auth/db (ยังไม่ล็อกอิน)
+  async function initFirebase() {
     const V = '10.12.0';
     const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
-    const { getAuth, signInAnonymously } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
-    const { getFirestore, collection, getDocs, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc } =
-      await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
-
+    const authMod = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
+    const fs = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
     const app = initializeApp(firebaseConfig);
-    await signInAnonymously(getAuth(app)); // เข้าใช้แบบ anonymous (ต้องเปิด Anonymous ใน console)
-    const db = getFirestore(app);
-    const col = () => collection(db, 'items');
+    _fb = { app, auth: authMod.getAuth(app), db: fs.getFirestore(app), authMod, fs };
+    return _fb;
+  }
 
+  // สร้าง store ที่ผูกกับผู้ใช้ -> ข้อมูลแยกเป็นส่วนตัวที่ users/{uid}
+  function makeUserStore(uid) {
+    const { db, fs } = _fb;
+    const { collection, getDocs, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc } = fs;
+    const col = () => collection(db, 'users', uid, 'items');
+    const metaDoc = () => doc(db, 'users', uid, 'meta', 'app');
     return {
       async getAll() {
         const snap = await getDocs(col());
@@ -532,41 +563,47 @@
         return { id: ref.id, ...payload };
       },
       async update(id, data) {
-        // อัปเดตเฉพาะ field ที่ส่งมา (รองรับการอัปเดตบางส่วน เช่น mark as done)
         const allowed = ['name','category','date','repeat','note','image','leadDays','done','doneAt'];
         const payload = {};
         allowed.forEach(k => { if (data[k] !== undefined) payload[k] = data[k]; });
-        await updateDoc(doc(db, 'items', id), payload);
+        await updateDoc(doc(db, 'users', uid, 'items', id), payload);
       },
       async remove(id) {
-        await deleteDoc(doc(db, 'items', id));
+        await deleteDoc(doc(db, 'users', uid, 'items', id));
       },
-      // เก็บค่า config ส่วนกลาง (เช่น หมวดหมู่ที่ผู้ใช้เพิ่มเอง) ที่ doc: meta/app
       async getMeta(key) {
-        const snap = await getDoc(doc(db, 'meta', 'app'));
+        const snap = await getDoc(metaDoc());
         return snap.exists() ? snap.data()[key] : undefined;
       },
       async setMeta(key, value) {
-        await setDoc(doc(db, 'meta', 'app'), { [key]: value }, { merge: true });
+        await setDoc(metaDoc(), { [key]: value }, { merge: true });
+      },
+      // อ่านข้อมูลจาก collection กลางเดิม (ก่อนมีระบบล็อกอิน) — ใช้ย้ายข้อมูลครั้งเดียว
+      async _legacyItems() {
+        const snap = await getDocs(collection(db, 'items'));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       },
     };
   }
 
-  // เลือก backend ตามการตั้งค่า (เรียกครั้งเดียวตอนเริ่มแอป)
-  // ลำดับความสำคัญ: Firebase > Google Apps Script > localStorage
-  let Store;
-  let SYNC_MODE = 'local';
+  // ย้ายข้อมูลเดิม (collection กลาง) มาเป็นของผู้ใช้ — ทำครั้งเดียวตอนล็อกอินครั้งแรก
+  async function migrateLegacyData() {
+    try {
+      if (await Store.getMeta('migrated')) return;
+      const mine = await Store.getAll();
+      if (mine.length === 0) {
+        const legacy = await Store._legacyItems();
+        for (const it of legacy) { const { id, createdAt, ...rest } = it; await Store.add(rest); }
+        if (legacy.length) console.log('ย้ายข้อมูลเดิม ' + legacy.length + ' รายการ');
+      }
+      await Store.setMeta('migrated', true);
+    } catch (e) { console.warn('ข้ามการย้ายข้อมูลเดิม:', e.message); }
+  }
+
+  // เลือก backend สำหรับโหมด local/gas (โหมด Firebase จัดการใน init ผ่าน auth)
   async function initStore() {
-    if (firebaseConfig && firebaseConfig.apiKey) {
-      Store = await createFirebaseStore();
-      SYNC_MODE = 'firebase';
-    } else if (GAS_URL) {
-      Store = RemoteStore;
-      SYNC_MODE = 'gas';
-    } else {
-      Store = LocalStore;
-      SYNC_MODE = 'local';
-    }
+    if (GAS_URL) { Store = RemoteStore; SYNC_MODE = 'gas'; }
+    else { Store = LocalStore; SYNC_MODE = 'local'; }
   }
 
   /* =========================================================
@@ -1373,11 +1410,54 @@
   /* =========================================================
      INIT
      ========================================================= */
+  // โหลด UI หลังจากรู้ store แล้ว (ใช้ทั้งหลังล็อกอิน Firebase และโหมด local)
+  async function bootData() {
+    await loadCustomCategories();
+    renderCategoryOptions();
+    renderFilterBar();
+    await loadData();
+  }
+
   (async function init() {
     renderFilterBar();
-
-    // เลือก backend (Firebase / GAS / localStorage) ให้เสร็จก่อนใช้งาน
     showState('loading');
+
+    // ===== โหมด Firebase: ต้องล็อกอินด้วย Google ก่อน =====
+    if (firebaseConfig && firebaseConfig.apiKey) {
+      SYNC_MODE = 'firebase';
+      updateSyncBadge();
+      try {
+        await initFirebase();
+      } catch (err) {
+        els.errorDetail.textContent = 'โหลด Firebase ไม่สำเร็จ: ' + (err.message || err);
+        showState('error');
+        return;
+      }
+      // ติดตามสถานะล็อกอิน
+      _fb.authMod.onAuthStateChanged(_fb.auth, async (user) => {
+        const loginScreen = document.getElementById('login-screen');
+        const logoutBtn = document.getElementById('btn-logout');
+        if (user) {
+          loginScreen.classList.add('hidden');
+          logoutBtn.classList.remove('hidden');
+          Store = makeUserStore(user.uid);
+          try {
+            showState('loading');
+            await migrateLegacyData();
+            await bootData();
+          } catch (err) {
+            els.errorDetail.textContent = err.message || String(err);
+            showState('error');
+          }
+        } else {
+          loginScreen.classList.remove('hidden');
+          logoutBtn.classList.add('hidden');
+        }
+      });
+      return; // ที่เหลือทำงานใน listener
+    }
+
+    // ===== โหมด local / GAS (ไม่ต้องล็อกอิน) =====
     try {
       await initStore();
     } catch (err) {
@@ -1386,14 +1466,11 @@
       return;
     }
     updateSyncBadge();
-
-    // โหลดหมวดหมู่ที่ผู้ใช้เพิ่มเอง แล้วอัปเดต UI ที่เกี่ยวข้อง
     await loadCustomCategories();
     renderCategoryOptions();
     renderFilterBar();
 
     // ใส่ข้อมูลตัวอย่างครั้งแรก เฉพาะโหมด localStorage เท่านั้น
-    // (โหมด Firebase/GAS จะไม่ seed เพื่อไม่ให้เขียนข้อมูลตัวอย่างลงฐานข้อมูลจริง)
     if (Store === LocalStore) {
       const existing = await Store.getAll();
       if (existing.length === 0) {
@@ -1412,6 +1489,22 @@
 
     await loadData();
   })();
+
+  // ===== ปุ่มเข้าสู่ระบบ / ออกจากระบบ (Google) =====
+  document.getElementById('btn-login').addEventListener('click', async () => {
+    const errEl = document.getElementById('login-error');
+    errEl.classList.add('hidden');
+    try {
+      const provider = new _fb.authMod.GoogleAuthProvider();
+      await _fb.authMod.signInWithPopup(_fb.auth, provider);
+    } catch (err) {
+      errEl.textContent = 'เข้าสู่ระบบไม่สำเร็จ: ' + (err.code || err.message || err);
+      errEl.classList.remove('hidden');
+    }
+  });
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    if (_fb && confirm('ออกจากระบบ?')) await _fb.authMod.signOut(_fb.auth);
+  });
 
   /* =========================================================
      PWA: ลงทะเบียน Service Worker (ทำงานออฟไลน์ + ติดตั้งได้)
