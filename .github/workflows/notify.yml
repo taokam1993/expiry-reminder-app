@@ -1,0 +1,26 @@
+name: แจ้งเตือน LINE (รายวัน)
+
+on:
+  schedule:
+    # 01:00 UTC = 08:00 ตามเวลาไทย (ทุกวัน)
+    - cron: '0 1 * * *'
+  workflow_dispatch: {}   # กดรันเองได้จากแท็บ Actions
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: ส่งแจ้งเตือนเข้า LINE
+        run: node notify/notify.js
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_TARGET_USER_ID: ${{ secrets.LINE_TARGET_USER_ID }}
+          NOTIFY_THRESHOLD_DAYS: '7'

@@ -10,8 +10,25 @@ expiry-reminder-app/
 ├── manifest.webmanifest    ข้อมูลแอปสำหรับติดตั้ง (ชื่อ, ไอคอน, สีธีม)
 ├── sw.js                   Service Worker (ทำงานออฟไลน์)
 ├── icons/                  ไอคอนแอปขนาดต่างๆ
-└── Code.gs                 Backend (Google Apps Script — ทางเลือก)
+├── Code.gs                 Backend ทางเลือก (Google Apps Script)
+├── notify/notify.js        สคริปต์แจ้งเตือน LINE (อ่าน Firestore -> ส่ง LINE)
+└── .github/workflows/      GitHub Actions: รัน notify.js ทุกเช้า 08:00 น.
 ```
+
+## แจ้งเตือนอัตโนมัติเข้า LINE (Messaging API)
+
+GitHub Actions จะรัน `notify/notify.js` ทุกเช้า 08:00 (เวลาไทย) อ่านรายการจาก Firestore
+แล้วส่งข้อความ LINE เฉพาะรายการที่ใกล้ครบกำหนด (ภายใน 7 วัน) หรือเลยกำหนดแล้ว
+
+**ตั้งค่า GitHub Secret ที่ต้องมี:**
+- `LINE_CHANNEL_ACCESS_TOKEN` — Channel access token จาก LINE Developers Console (จำเป็น)
+- `LINE_TARGET_USER_ID` — (ไม่ใส่ก็ได้) ถ้าใส่ = ส่งแบบ push หา userId นั้น, ถ้าไม่ใส่ = broadcast หาเพื่อนทุกคนของ OA
+
+**ทดสอบ/สั่งรันเอง:** แท็บ Actions บน GitHub > เลือก workflow "แจ้งเตือน LINE (รายวัน)" > Run workflow
+หรือใช้ `gh workflow run notify.yml`
+
+> หมายเหตุ: สคริปต์อ่าน Firestore ผ่าน REST + anonymous auth (ใช้ Web API key ที่เป็น public)
+> จึงไม่ต้องใช้ service account — ต้องเปิด Anonymous sign-in และ rules อนุญาต `read: if request.auth != null`
 
 ## ⚠️ สำคัญ: PWA ต้องเปิดผ่าน "เซิร์ฟเวอร์"
 
