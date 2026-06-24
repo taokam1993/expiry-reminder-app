@@ -207,15 +207,21 @@
           <!-- ปุ่มถูก render ด้วย JS -->
         </div>
 
-        <!-- จัดกลุ่มการ์ด -->
-        <div class="flex items-center justify-end gap-2 mt-2">
-          <label for="group-select" class="text-xs text-gray-500">จัดกลุ่ม:</label>
-          <select id="group-select"
-            class="text-xs rounded-lg border border-gray-300 px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-            <option value="none">ไม่จัดกลุ่ม</option>
-            <option value="status">ตามความเร่งด่วน</option>
-            <option value="category">ตามหมวดหมู่</option>
-          </select>
+        <!-- เลือกหลายรายการ + จัดกลุ่มการ์ด -->
+        <div class="flex items-center justify-between gap-2 mt-2">
+          <button id="btn-select-mode" class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            เลือกหลายรายการ
+          </button>
+          <div class="flex items-center gap-2">
+            <label for="group-select" class="text-xs text-gray-500">จัดกลุ่ม:</label>
+            <select id="group-select"
+              class="text-xs rounded-lg border border-gray-300 px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="none">ไม่จัดกลุ่ม</option>
+              <option value="status">ตามความเร่งด่วน</option>
+              <option value="category">ตามหมวดหมู่</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -223,14 +229,29 @@
 
   <!-- ===================== MAIN: CARD LIST ===================== -->
   <main class="max-w-2xl mx-auto px-4 py-4 pb-28">
-    <!-- แท็บ รายการปัจจุบัน / ประวัติ -->
+    <!-- แท็บ รายการ / ปฏิทิน / ประวัติ -->
     <div class="flex gap-2 mb-4">
-      <button data-view="active" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">
-        📋 รายการ
-      </button>
-      <button data-view="history" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">
-        ✅ ประวัติ
-      </button>
+      <button data-view="active" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">📋 รายการ</button>
+      <button data-view="calendar" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">📅 ปฏิทิน</button>
+      <button data-view="history" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">✅ ประวัติ</button>
+    </div>
+
+    <!-- มุมมองปฏิทิน -->
+    <div id="calendar-view" class="hidden">
+      <div class="flex items-center justify-between mb-3">
+        <button id="cal-prev" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" aria-label="เดือนก่อน">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <span id="cal-title" class="font-semibold text-gray-800"></span>
+        <button id="cal-next" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" aria-label="เดือนถัดไป">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+      <div class="grid grid-cols-7 gap-1 text-center text-[11px] text-gray-400 mb-1">
+        <span>อา</span><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span>
+      </div>
+      <div id="cal-grid" class="grid grid-cols-7 gap-1"></div>
+      <div id="cal-day-items" class="mt-4 space-y-3"></div>
     </div>
 
     <!-- Loading state -->
@@ -268,6 +289,22 @@
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
   </button>
+
+  <!-- ===================== แถบเลือกหลายรายการ ===================== -->
+  <div id="bulk-bar" class="hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 shadow-lg">
+    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+      <span id="bulk-count" class="text-sm font-medium text-gray-700 flex-1">เลือก 0 รายการ</span>
+      <button id="bulk-done" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4" /></svg>
+        ทำเสร็จ
+      </button>
+      <button id="bulk-delete" class="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        ลบ
+      </button>
+      <button id="bulk-cancel" class="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">ยกเลิก</button>
+    </div>
+  </div>
 
   <!-- ===================== MODAL ฟอร์ม ===================== -->
   <div id="modal" class="modal-hidden hidden fixed inset-0 z-30">
@@ -330,15 +367,19 @@
             <span class="block text-xs text-gray-400 mt-1">LINE จะเริ่มเตือนล่วงหน้ากี่วันก่อนถึงกำหนด</span>
           </div>
 
-          <!-- แจ้งเตือนซ้ำรายปี -->
-          <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
-            <input id="item-repeat" type="checkbox"
-              class="mt-0.5 w-5 h-5 rounded text-blue-600 focus:ring-blue-500" />
-            <span class="text-sm">
-              <span class="font-medium text-gray-700">🔁 แจ้งเตือนซ้ำทุกปี</span>
-              <span class="block text-xs text-gray-400 mt-0.5">เหมาะกับรายการที่ต่ออายุประจำ เช่น ภาษีรถ บัตรประชาชน — เมื่อเลยกำหนด ระบบจะเลื่อนเป็นปีถัดไปอัตโนมัติ</span>
-            </span>
-          </label>
+          <!-- ทำซ้ำ (ยืดหยุ่น) -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">🔁 ทำซ้ำ</label>
+            <select id="item-repeat"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+              <option value="none">ไม่ทำซ้ำ</option>
+              <option value="monthly">ทุกเดือน</option>
+              <option value="quarterly">ทุก 3 เดือน</option>
+              <option value="biannual">ทุก 6 เดือน</option>
+              <option value="yearly">ทุกปี</option>
+            </select>
+            <span class="block text-xs text-gray-400 mt-1">เมื่อทำเสร็จ/เลยกำหนด ระบบจะเลื่อนเป็นรอบถัดไปอัตโนมัติ</span>
+          </div>
 
           <!-- โน้ต / รายละเอียดเพิ่มเติม -->
           <div>
@@ -759,28 +800,37 @@
     return `เหลืออีก ${d} วัน`;
   }
 
-  // บวกปีให้วันที่ (คืน YYYY-MM-DD)
-  function addYears(dateStr, n) {
-    const d = new Date(dateStr);
-    d.setFullYear(d.getFullYear() + n);
-    return d.toISOString().slice(0, 10);
+  // รูปแบบการทำซ้ำ -> จำนวนเดือนต่อรอบ + ป้ายชื่อ
+  const REPEAT_MONTHS = { monthly: 1, quarterly: 3, biannual: 6, yearly: 12 };
+  const REPEAT_LABEL  = { monthly: 'ทุกเดือน', quarterly: 'ทุก 3 เดือน', biannual: 'ทุก 6 เดือน', yearly: 'ทุกปี' };
+  function isRecurring(repeat) { return repeat && repeat !== 'none' && REPEAT_MONTHS[repeat]; }
+
+  // บวกเดือนให้วันที่ (คืน YYYY-MM-DD) — ปัดวันสิ้นเดือนถ้าวันที่เกิน (เช่น 31 ม.ค. +1 -> 28 ก.พ.)
+  function addMonths(dateStr, n) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1 + n, 1);
+    const lastDay = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
+    dt.setDate(Math.min(d, lastDay));
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
   }
 
-  // เลื่อนวันของรายการ "ทำซ้ำทุกปี" ไปปีถัดไป จนกว่าจะถึงวันนี้/อนาคต
-  function nextYearlyDate(dateStr) {
+  // เลื่อนวันตามรอบการทำซ้ำ จนกว่าจะถึงวันนี้/อนาคต
+  function nextRecurrence(dateStr, repeat) {
+    const step = REPEAT_MONTHS[repeat];
+    if (!step) return dateStr;
     let s = dateStr;
-    while (daysLeft(s) < 0) s = addYears(s, 1);
+    while (daysLeft(s) < 0) s = addMonths(s, step);
     return s;
   }
 
-  // ตรวจรายการที่ทำซ้ำทุกปีและเลยกำหนดแล้ว -> เลื่อนวันอัตโนมัติ + บันทึก
+  // ตรวจรายการที่ทำซ้ำและเลยกำหนดแล้ว -> เลื่อนวันอัตโนมัติ + บันทึก
   // (ข้ามรายการที่ทำเสร็จแล้ว/อยู่ในประวัติ)
   async function rolloverRecurring() {
-    const due = state.items.filter(i => i.repeat === 'yearly' && !i.done && daysLeft(i.date) < 0);
+    const due = state.items.filter(i => isRecurring(i.repeat) && !i.done && daysLeft(i.date) < 0);
     for (const item of due) {
-      const newDate = nextYearlyDate(item.date);
+      const newDate = nextRecurrence(item.date, item.repeat);
       await Store.update(item.id, {
-        name: item.name, category: item.category, date: newDate, repeat: 'yearly',
+        name: item.name, category: item.category, date: newDate, repeat: item.repeat,
       });
       item.date = newDate; // อัปเดต cache ในหน่วยความจำด้วย
     }
@@ -810,7 +860,11 @@
     search: '',             // คำค้นหา
     filter: 'all',          // หมวดหมู่ที่เลือก: all | vehicle | ...
     group: 'none',          // การจัดกลุ่ม: none | status | category
-    view: 'active',         // มุมมอง: active (รายการ) | history (ประวัติ)
+    view: 'active',         // มุมมอง: active | calendar | history
+    selectMode: false,      // โหมดเลือกหลายรายการ
+    selected: new Set(),    // id ที่เลือกไว้
+    calMonth: (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(), // เดือนที่แสดงในปฏิทิน
+    calDay: null,           // วันที่เลือกในปฏิทิน (YYYY-MM-DD)
   };
 
   // โหลดข้อมูลจาก backend (ยิง fetch จริงเฉพาะตอนนี้)
@@ -835,10 +889,7 @@
 
   // วาดผลจาก state ใน cache (ไม่ยิง fetch) — ใช้ตอนค้นหา/กรอง
   function render() {
-    showState('list');
     renderViewTabs();
-
-    const isHistory = state.view === 'history';
 
     // อัปเดต Dashboard จากรายการที่ยัง active เท่านั้น (ไม่นับที่ทำเสร็จแล้ว)
     let c = 0, w = 0, s = 0;
@@ -851,6 +902,22 @@
     els.statCritical.textContent = c;
     els.statWarning.textContent = w;
     els.statSafe.textContent = s;
+
+    // มุมมองปฏิทิน — แยกออกจากรายการ
+    const calView = document.getElementById('calendar-view');
+    if (state.view === 'calendar') {
+      els.list.classList.add('hidden');
+      els.empty.classList.add('hidden');
+      els.loading.classList.add('hidden');
+      els.error.classList.add('hidden');
+      calView.classList.remove('hidden');
+      renderCalendar();
+      return;
+    }
+    calView.classList.add('hidden');
+    showState('list');
+
+    const isHistory = state.view === 'history';
 
     // กรองตามมุมมอง (active/history) + หมวดหมู่ + คำค้น (ชื่อ/โน้ต)
     const keyword = state.search.trim().toLowerCase();
@@ -901,6 +968,58 @@
         (active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50');
     });
   }
+
+  /* =========================================================
+     มุมมองปฏิทิน
+     ========================================================= */
+  const THAI_MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+  function renderCalendar() {
+    const y = state.calMonth.getFullYear();
+    const m = state.calMonth.getMonth();
+    document.getElementById('cal-title').textContent = `${THAI_MONTHS_FULL[m]} ${y + 543}`;
+
+    const firstDay = new Date(y, m, 1).getDay();          // 0=อาทิตย์
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    if (!state.calDay) state.calDay = todayStr;
+
+    // จับคู่วันที่ -> รายการที่ยัง active
+    const byDate = {};
+    state.items.filter(i => !i.done && i.date).forEach(i => { (byDate[i.date] = byDate[i.date] || []).push(i); });
+
+    const cells = [];
+    for (let i = 0; i < firstDay; i++) cells.push('<div></div>');
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const items = byDate[ds] || [];
+      const isToday = ds === todayStr;
+      const isSel = ds === state.calDay;
+      let dot = '';
+      if (items.length) {
+        const st = items.map(it => getStatus(it.date));
+        const color = st.includes('critical') ? 'bg-red-500' : st.includes('warning') ? 'bg-amber-400' : 'bg-emerald-400';
+        dot = `<span class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${color}"></span>`;
+      }
+      const cls = isSel ? 'bg-blue-600 text-white' : isToday ? 'bg-blue-50 text-blue-600 font-semibold' : 'hover:bg-gray-100 text-gray-700';
+      cells.push(`<button onclick="selectCalDay('${ds}')" class="relative aspect-square rounded-lg text-sm flex items-center justify-center ${cls}">${d}${dot}</button>`);
+    }
+    document.getElementById('cal-grid').innerHTML = cells.join('');
+    renderCalDayItems();
+  }
+
+  // รายการของวันที่เลือกในปฏิทิน
+  function renderCalDayItems() {
+    const box = document.getElementById('cal-day-items');
+    if (!state.calDay) { box.innerHTML = '<p class="text-center text-xs text-gray-400 mt-2">แตะวันที่เพื่อดูรายการ</p>'; return; }
+    const items = state.items.filter(i => !i.done && i.date === state.calDay);
+    const header = `<div class="text-sm font-medium text-gray-600 mb-1">📅 ${formatDate(state.calDay)}</div>`;
+    box.innerHTML = items.length
+      ? header + items.map(renderCard).join('')
+      : header + '<p class="text-center text-xs text-gray-400 py-3">ไม่มีรายการในวันนี้</p>';
+  }
+
+  window.selectCalDay = function (ds) { state.calDay = ds; renderCalendar(); };
 
   // จัดกลุ่มรายการตาม state.group -> [{label, items}]
   function groupItems(items) {
@@ -981,8 +1100,23 @@
            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
          </button>`;
 
+    // โหมดเลือกหลายรายการ: ทั้งการ์ดคลิกเพื่อเลือก, แสดง checkbox แทนปุ่มจัดการ
+    const sel = state.selectMode;
+    const checked = state.selected.has(item.id);
+    const cardAttr = sel
+      ? `onclick="toggleSelect('${item.id}')" class="bg-white rounded-xl shadow-sm ${border} p-4 flex items-start gap-3 cursor-pointer ${checked ? 'ring-2 ring-blue-500' : ''} ${isDone ? 'opacity-80' : ''}"`
+      : `class="bg-white rounded-xl shadow-sm ${border} p-4 flex items-start gap-3 ${isDone ? 'opacity-80' : ''}"`;
+    const rightCol = sel
+      ? `<div class="shrink-0 self-center">
+           <span class="w-6 h-6 rounded-full border-2 ${checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300'} flex items-center justify-center text-white">
+             ${checked ? '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+           </span>
+         </div>`
+      : `<div class="flex flex-col gap-1 shrink-0">${actions}</div>`;
+    const imgAttr = sel ? '' : `onclick="openImage('${item.id}')"`;
+
     return `
-      <div class="bg-white rounded-xl shadow-sm ${border} p-4 flex items-start gap-3 ${isDone ? 'opacity-80' : ''}">
+      <div ${cardAttr}>
         <div class="text-2xl leading-none mt-0.5">${cat.icon}</div>
 
         <div class="flex-1 min-w-0">
@@ -993,8 +1127,8 @@
 
           <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
             <span>${cat.label}</span>
-            ${item.repeat === 'yearly'
-              ? '<span class="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">🔁 ทุกปี</span>'
+            ${isRecurring(item.repeat)
+              ? `<span class="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">🔁 ${REPEAT_LABEL[item.repeat]}</span>`
               : ''}
           </div>
 
@@ -1014,11 +1148,11 @@
           </div>` : ''}
 
           ${item.image ? `
-          <img src="${item.image}" alt="รูปแนบ" onclick="openImage('${item.id}')"
-            class="mt-2 w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer" />` : ''}
+          <img src="${item.image}" alt="รูปแนบ" ${imgAttr}
+            class="mt-2 w-20 h-20 object-cover rounded-lg border border-gray-200 ${sel ? '' : 'cursor-pointer'}" />` : ''}
         </div>
 
-        <div class="flex flex-col gap-1 shrink-0">${actions}</div>
+        ${rightCol}
       </div>
     `;
   }
@@ -1054,7 +1188,7 @@
         this.fName.value = item.name;
         this.fCategory.value = item.category;
         this.fDate.value = item.date;
-        this.fRepeat.checked = item.repeat === 'yearly';
+        this.fRepeat.value = item.repeat || 'none';
         this.fNote.value = item.note || '';
         this.fLead.value = String(item.leadDays || 7);
         this.setImage(item.image || '');
@@ -1108,27 +1242,32 @@
     }
   };
 
-  // ทำเสร็จ -> ย้ายเข้าประวัติ. ถ้าเป็นรายการทำซ้ำทุกปี จะสร้างรายการของปีถัดไปให้ด้วย
-  window.markDone = async function (id) {
-    const item = state.items.find(i => i.id === id);
-    if (!item) return;
+  // ทำเสร็จ 1 รายการ (ไม่ reload/toast — ใช้ร่วมกับ bulk)
+  async function markDoneCore(item) {
     const today = new Date().toISOString().slice(0, 10);
-    await Store.update(id, {
+    await Store.update(item.id, {
       name: item.name, category: item.category, date: item.date,
       repeat: item.repeat || 'none', note: item.note || '', image: item.image || '',
       done: true, doneAt: today,
     });
-    // ทำซ้ำทุกปี -> สร้างรายการรอบถัดไปอัตโนมัติ
-    if (item.repeat === 'yearly') {
+    if (isRecurring(item.repeat)) {
+      const step = REPEAT_MONTHS[item.repeat];
       await Store.add({
         name: item.name, category: item.category,
-        date: nextYearlyDate(addYears(item.date, 1)),
-        repeat: 'yearly', note: item.note || '', image: item.image || '',
+        date: nextRecurrence(addMonths(item.date, step), item.repeat),
+        repeat: item.repeat, note: item.note || '', image: item.image || '',
         leadDays: item.leadDays || 7, done: false, doneAt: '',
       });
     }
+  }
+
+  // ทำเสร็จ -> ย้ายเข้าประวัติ (ถ้าทำซ้ำ จะสร้างรอบถัดไปให้ด้วย)
+  window.markDone = async function (id) {
+    const item = state.items.find(i => i.id === id);
+    if (!item) return;
+    await markDoneCore(item);
     await loadData();
-    showToast(item.repeat === 'yearly' ? 'ทำเสร็จ + สร้างรอบถัดไปแล้ว' : 'ย้ายเข้าประวัติแล้ว', 'success');
+    showToast(isRecurring(item.repeat) ? 'ทำเสร็จ + สร้างรอบถัดไปแล้ว' : 'ย้ายเข้าประวัติแล้ว', 'success');
   };
 
   // กู้คืนจากประวัติ -> กลับมาเป็นรายการปกติ
@@ -1146,6 +1285,63 @@
 
   // ปุ่ม "ลองอีกครั้ง" ใน error state
   window.reload = loadData;
+
+  /* =========================================================
+     เลือกหลายรายการ (bulk select)
+     ========================================================= */
+  window.toggleSelect = function (id) {
+    if (state.selected.has(id)) state.selected.delete(id);
+    else state.selected.add(id);
+    render();
+    updateBulkBar();
+  };
+
+  function enterSelectMode() {
+    state.selectMode = true;
+    state.selected.clear();
+    document.getElementById('fab').classList.add('hidden');
+    document.getElementById('bulk-bar').classList.remove('hidden');
+    render();
+    updateBulkBar();
+  }
+  function exitSelectMode() {
+    state.selectMode = false;
+    state.selected.clear();
+    document.getElementById('fab').classList.remove('hidden');
+    document.getElementById('bulk-bar').classList.add('hidden');
+    render();
+  }
+  function updateBulkBar() {
+    document.getElementById('bulk-count').textContent = `เลือก ${state.selected.size} รายการ`;
+    // ปุ่ม "ทำเสร็จ" ใช้ได้เฉพาะมุมมองรายการ (active)
+    document.getElementById('bulk-done').classList.toggle('hidden', state.view !== 'active');
+  }
+
+  document.getElementById('btn-select-mode').addEventListener('click', enterSelectMode);
+  document.getElementById('bulk-cancel').addEventListener('click', exitSelectMode);
+  document.getElementById('bulk-delete').addEventListener('click', async () => {
+    const ids = [...state.selected];
+    if (ids.length === 0) { showToast('ยังไม่ได้เลือกรายการ', 'error'); return; }
+    if (!(await confirmDialog({ title: 'ลบรายการ', message: `ลบ ${ids.length} รายการที่เลือก?`, okText: 'ลบ', danger: true, icon: '🗑️' }))) return;
+    showState('loading');
+    for (const id of ids) await Store.remove(id);
+    exitSelectMode();
+    await loadData();
+    showToast(`ลบ ${ids.length} รายการแล้ว`, 'success');
+  });
+  document.getElementById('bulk-done').addEventListener('click', async () => {
+    const ids = [...state.selected];
+    if (ids.length === 0) { showToast('ยังไม่ได้เลือกรายการ', 'error'); return; }
+    if (!(await confirmDialog({ title: 'ทำเสร็จ', message: `ทำเสร็จ ${ids.length} รายการที่เลือก?`, okText: 'ทำเสร็จ', icon: '✅' }))) return;
+    showState('loading');
+    for (const id of ids) {
+      const item = state.items.find(i => i.id === id);
+      if (item && !item.done) await markDoneCore(item);
+    }
+    exitSelectMode();
+    await loadData();
+    showToast(`ทำเสร็จ ${ids.length} รายการแล้ว`, 'success');
+  });
 
   // วาดปุ่มเทมเพลตเพิ่มด่วน (คลิกแล้วเติมชื่อ/หมวด/ทำซ้ำ ให้ผู้ใช้เลือกแค่วันที่)
   function renderQuickTemplates() {
@@ -1265,7 +1461,7 @@
       name: modal.fName.value.trim(),
       category: modal.fCategory.value,
       date: modal.fDate.value,
-      repeat: modal.fRepeat.checked ? 'yearly' : 'none',
+      repeat: modal.fRepeat.value || 'none',
       note: modal.fNote.value.trim(),
       image: modal.currentImage || '',
       leadDays: parseInt(modal.fLead.value, 10) || 7,
@@ -1322,8 +1518,19 @@
   // แท็บ รายการ / ประวัติ
   els.viewTabs.forEach(tab => tab.addEventListener('click', () => {
     state.view = tab.dataset.view;
-    render();
+    if (state.selectMode) exitSelectMode();
+    else render();
   }));
+
+  // เลื่อนเดือนในปฏิทิน
+  document.getElementById('cal-prev').addEventListener('click', () => {
+    state.calMonth = new Date(state.calMonth.getFullYear(), state.calMonth.getMonth() - 1, 1);
+    renderCalendar();
+  });
+  document.getElementById('cal-next').addEventListener('click', () => {
+    state.calMonth = new Date(state.calMonth.getFullYear(), state.calMonth.getMonth() + 1, 1);
+    renderCalendar();
+  });
 
   // คลิกเทมเพลตเพิ่มด่วน -> เติมฟอร์ม (event delegation)
   document.getElementById('quick-templates').addEventListener('click', (e) => {
@@ -1332,7 +1539,7 @@
     const t = QUICK_TEMPLATES[+btn.dataset.tpl];
     modal.fName.value = t.name;
     modal.fCategory.value = t.category;
-    modal.fRepeat.checked = t.repeat === 'yearly';
+    modal.fRepeat.value = t.repeat || 'none';
     modal.fDate.focus(); // ให้ผู้ใช้เลือกวันที่ต่อ
   });
 
@@ -1467,10 +1674,10 @@
       const s = String(v == null ? '' : v);
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
-    const headers = ['ชื่อรายการ', 'หมวดหมู่', 'วันที่กำหนด', 'ทำซ้ำทุกปี', 'เตือนล่วงหน้า(วัน)', 'จำนวนวันคงเหลือ', 'สถานะ', 'โน้ต'];
+    const headers = ['ชื่อรายการ', 'หมวดหมู่', 'วันที่กำหนด', 'ทำซ้ำ', 'เตือนล่วงหน้า(วัน)', 'จำนวนวันคงเหลือ', 'สถานะ', 'โน้ต'];
     const rows = state.items.map(i => {
       const cat = (CATEGORIES[i.category] || {}).label || i.category;
-      const repeat = i.repeat === 'yearly' ? 'ใช่' : 'ไม่';
+      const repeat = isRecurring(i.repeat) ? REPEAT_LABEL[i.repeat] : 'ไม่';
       const status = i.done ? `เสร็จแล้ว (${i.doneAt || ''})` : daysLeftText(i.date);
       const left = i.done ? '' : daysLeft(i.date);
       return [i.name, cat, formatDate(i.date), repeat, i.leadDays || 7, left, status, i.note || ''].map(esc).join(',');
@@ -1501,7 +1708,7 @@
           name: String(i.name),
           category: CATEGORIES[i.category] ? i.category : 'appointment',
           date: String(i.date),
-          repeat: i.repeat === 'yearly' ? 'yearly' : 'none',
+          repeat: REPEAT_MONTHS[i.repeat] ? i.repeat : 'none',
           note: i.note ? String(i.note) : '',
           image: typeof i.image === 'string' ? i.image : '',
           leadDays: parseInt(i.leadDays, 10) || 7,
