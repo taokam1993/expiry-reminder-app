@@ -59,7 +59,14 @@
     html.dark .border-gray-300 { border-color:#475569; }
     html.dark .border-gray-200 { border-color:#334155; }
     html.dark .border-gray-100 { border-color:#334155; }
-    html.dark input, html.dark select, html.dark textarea { color:#f1f5f9; }
+    /* ช่องกรอกในโหมดมืด: พื้นเข้ม + ตัวอักษรสว่าง (กันพิมพ์แล้วมองไม่เห็น) */
+    html.dark input:not([type="checkbox"]):not([type="radio"]),
+    html.dark select,
+    html.dark textarea {
+      background-color:#1e293b; color:#f1f5f9; border-color:#475569;
+    }
+    /* color-scheme ทำให้ปฏิทิน/ลูกศร dropdown/checkbox ของระบบเป็นธีมมืดด้วย */
+    html.dark input, html.dark select, html.dark textarea { color-scheme: dark; }
     html.dark input::placeholder, html.dark textarea::placeholder { color:#64748b; }
     /* การ์ดสรุป (stat) ในโหมดมืด ให้เป็นโทนสีจางบนพื้นเข้ม */
     html.dark .bg-red-50 { background-color:rgba(239,68,68,.13); }
