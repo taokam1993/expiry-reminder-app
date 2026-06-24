@@ -134,6 +134,13 @@
             </button>
           </div>
         </div>
+        <!-- รีเฟรช / ดึงข้อมูลล่าสุด (เผื่อแอพค้าง) -->
+        <button id="btn-refresh" title="รีเฟรช / ดึงข้อมูลล่าสุด"
+          class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="รีเฟรช">
+          <svg id="icon-refresh" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
         <!-- สลับโหมดมืด/สว่าง -->
         <button id="btn-theme" title="สลับโหมดมืด/สว่าง"
           class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="สลับธีม">
@@ -1399,6 +1406,22 @@
     applyThemeIcon();
   });
   applyThemeIcon();
+
+  // รีเฟรช: ดึงข้อมูลล่าสุดจาก backend ใหม่ (เผื่อแอพค้าง/ดึงจากอีกเครื่อง)
+  let _refreshing = false;
+  document.getElementById('btn-refresh').addEventListener('click', async () => {
+    if (_refreshing) return;
+    _refreshing = true;
+    const icon = document.getElementById('icon-refresh');
+    icon.classList.add('animate-spin');
+    const start = Date.now();
+    await loadData();
+    // ให้ไอคอนหมุนอย่างน้อย 0.5 วิ เพื่อให้เห็น feedback
+    setTimeout(() => icon.classList.remove('animate-spin'), Math.max(0, 500 - (Date.now() - start)));
+    const failed = !document.getElementById('error-state').classList.contains('hidden');
+    showToast(failed ? 'รีเฟรชไม่สำเร็จ' : 'อัปเดตข้อมูลล่าสุดแล้ว', failed ? 'error' : 'success');
+    _refreshing = false;
+  });
 
   /* =========================================================
      สำรอง / นำเข้าข้อมูล (Export JSON / CSV, Import JSON)
