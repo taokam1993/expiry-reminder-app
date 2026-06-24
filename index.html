@@ -45,6 +45,9 @@
     /* Pulse สำหรับการ์ดด่วน */
     @keyframes softpulse { 0%,100%{ box-shadow:0 0 0 0 rgba(239,68,68,.0);} 50%{ box-shadow:0 0 0 4px rgba(239,68,68,.12);} }
     .pulse-critical { animation: softpulse 2s ease-in-out infinite; }
+    /* Toast */
+    @keyframes toastIn { from{opacity:0; transform:translateY(-14px) scale(.96);} to{opacity:1; transform:translateY(0) scale(1);} }
+    .toast-item { animation: toastIn .22s ease; transition: opacity .3s ease; pointer-events:auto; }
 
     /* ===== โหมดมืด (Dark mode) — override สีของ utility ที่ใช้ในแอป ===== */
     html.dark body { background-color:#0f172a; }
@@ -392,6 +395,26 @@
     </div>
   </div>
 
+  <!-- ===================== TOAST + CONFIRM (ป็อปอัพสวยๆ) ===================== -->
+  <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[70] flex flex-col items-center gap-2 pointer-events-none w-full px-4 max-w-sm"></div>
+
+  <div id="confirm-modal" class="modal-hidden hidden fixed inset-0 z-[60]">
+    <div id="confirm-backdrop" class="modal-backdrop absolute inset-0 bg-black/40"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+      <div class="modal-panel bg-white rounded-2xl shadow-xl w-full max-w-xs overflow-hidden">
+        <div class="p-5 text-center">
+          <div id="confirm-icon" class="text-4xl mb-2">❓</div>
+          <h3 id="confirm-title" class="font-semibold text-gray-800 mb-1"></h3>
+          <p id="confirm-msg" class="text-sm text-gray-500 whitespace-pre-line"></p>
+        </div>
+        <div class="flex border-t border-gray-100">
+          <button id="confirm-cancel" class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-50">ยกเลิก</button>
+          <button id="confirm-ok" class="flex-1 py-3 font-medium border-l border-gray-100 text-blue-600 hover:bg-blue-50">ตกลง</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
   /* =========================================================
      CONFIG: ข้อมูลหมวดหมู่ (ไอคอน + ชื่อภาษาไทย)
@@ -417,6 +440,50 @@
     { name: 'ต่ออายุ Canva',               category: 'service', repeat: 'yearly' },
     { name: 'ต่ออายุ Google One',          category: 'service', repeat: 'yearly' },
   ];
+
+  /* =========================================================
+     UI: Toast + Confirm dialog (ป็อปอัพสวยๆ แทน alert/confirm ของเบราว์เซอร์)
+     ========================================================= */
+  function showToast(message, type = 'info') {
+    const c = document.getElementById('toast-container');
+    const colors = { success: 'bg-emerald-600', error: 'bg-red-600', info: 'bg-gray-800' };
+    const icons  = { success: '✓', error: '✕', info: 'ℹ' };
+    const el = document.createElement('div');
+    el.className = `toast-item ${colors[type] || colors.info} text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2`;
+    const ic = document.createElement('span'); ic.className = 'font-bold shrink-0'; ic.textContent = icons[type] || '';
+    const tx = document.createElement('span'); tx.textContent = message;
+    el.append(ic, tx);
+    c.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2800);
+  }
+
+  let _confirmResolve = null;
+  function confirmDialog({ title = 'ยืนยัน', message = '', okText = 'ตกลง', danger = false, icon = '❓' } = {}) {
+    return new Promise(resolve => {
+      _confirmResolve = resolve;
+      document.getElementById('confirm-icon').textContent = icon;
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-msg').textContent = message;
+      const ok = document.getElementById('confirm-ok');
+      ok.textContent = okText;
+      ok.className = 'flex-1 py-3 font-medium border-l border-gray-100 ' +
+        (danger ? 'text-red-600 hover:bg-red-50' : 'text-blue-600 hover:bg-blue-50');
+      const m = document.getElementById('confirm-modal');
+      m.classList.remove('hidden');
+      document.body.classList.add('modal-open');
+      requestAnimationFrame(() => m.classList.remove('modal-hidden'));
+    });
+  }
+  function closeConfirm(result) {
+    const m = document.getElementById('confirm-modal');
+    m.classList.add('modal-hidden');
+    document.body.classList.remove('modal-open');
+    setTimeout(() => m.classList.add('hidden'), 200);
+    if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+  }
+  document.getElementById('confirm-ok').addEventListener('click', () => closeConfirm(true));
+  document.getElementById('confirm-cancel').addEventListener('click', () => closeConfirm(false));
+  document.getElementById('confirm-backdrop').addEventListener('click', () => closeConfirm(false));
 
   /* =========================================================
      ⚙️  ตั้งค่า: วาง Web app URL ของ Google Apps Script ตรงนี้
@@ -1009,9 +1076,11 @@
   };
 
   window.deleteItem = async function (id) {
-    if (confirm('ต้องการลบรายการนี้ใช่หรือไม่?')) {
+    const ok = await confirmDialog({ title: 'ลบรายการ', message: 'ต้องการลบรายการนี้ใช่หรือไม่?', okText: 'ลบ', danger: true, icon: '🗑️' });
+    if (ok) {
       await Store.remove(id);
       await loadData();
+      showToast('ลบรายการแล้ว', 'success');
     }
   };
 
@@ -1035,6 +1104,7 @@
       });
     }
     await loadData();
+    showToast(item.repeat === 'yearly' ? 'ทำเสร็จ + สร้างรอบถัดไปแล้ว' : 'ย้ายเข้าประวัติแล้ว', 'success');
   };
 
   // กู้คืนจากประวัติ -> กลับมาเป็นรายการปกติ
@@ -1047,6 +1117,7 @@
       done: false, doneAt: '',
     });
     await loadData();
+    showToast('กู้คืนรายการแล้ว', 'success');
   };
 
   // ปุ่ม "ลองอีกครั้ง" ใน error state
@@ -1117,7 +1188,7 @@
   async function addCustomCategory(icon, label) {
     icon = (icon || '').trim() || '🏷️';
     label = (label || '').trim();
-    if (!label) { alert('กรุณาใส่ชื่อหมวดหมู่'); return; }
+    if (!label) { showToast('กรุณาใส่ชื่อหมวดหมู่', 'error'); return; }
     const key = 'c_' + Date.now().toString(36);
     const custom = (await Store.getMeta('categories')) || {};
     custom[key] = { label, icon };
@@ -1131,7 +1202,7 @@
     const msg = used
       ? 'มีรายการที่ใช้หมวดนี้อยู่ ถ้าลบ รายการเหล่านั้นจะไม่มีหมวด — ลบต่อไหม?'
       : 'ลบหมวดหมู่นี้?';
-    if (!confirm(msg)) return;
+    if (!(await confirmDialog({ title: 'ลบหมวดหมู่', message: msg, okText: 'ลบ', danger: true, icon: '🗑️' }))) return;
     const custom = (await Store.getMeta('categories')) || {};
     delete custom[key];
     await Store.setMeta('categories', custom);
@@ -1189,8 +1260,9 @@
       else await Store.add(data);
       modal.close();
       await loadData();
+      showToast(id ? 'บันทึกการแก้ไขแล้ว' : 'เพิ่มรายการแล้ว', 'success');
     } catch (err) {
-      alert('บันทึกไม่สำเร็จ: ' + (err.message || err));
+      showToast('บันทึกไม่สำเร็จ: ' + (err.message || err), 'error');
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = original;
@@ -1253,7 +1325,7 @@
       const dataUrl = await compressImage(file, 1000, 0.7);
       modal.setImage(dataUrl);
     } catch (err) {
-      alert('ใช้รูปนี้ไม่ได้: ' + (err.message || err));
+      showToast('ใช้รูปนี้ไม่ได้: ' + (err.message || err), 'error');
     } finally {
       imageFile.value = '';
     }
@@ -1333,7 +1405,7 @@
 
   // สำรองเป็น JSON (นำเข้ากลับได้ครบ รวมรูป)
   document.getElementById('btn-export-json').addEventListener('click', () => {
-    if (state.items.length === 0) { alert('ยังไม่มีข้อมูลให้สำรอง'); return; }
+    if (state.items.length === 0) { showToast('ยังไม่มีข้อมูลให้สำรอง', 'error'); return; }
     const payload = {
       app: 'expiry-reminder',
       version: 2,
@@ -1350,7 +1422,7 @@
 
   // ส่งออก CSV (เปิดใน Excel / Google ชีต) — ไม่รวมรูปเพราะใหญ่เกินไป
   document.getElementById('btn-export-csv').addEventListener('click', () => {
-    if (state.items.length === 0) { alert('ยังไม่มีข้อมูลให้ส่งออก'); return; }
+    if (state.items.length === 0) { showToast('ยังไม่มีข้อมูลให้ส่งออก', 'error'); return; }
     const esc = (v) => {
       const s = String(v == null ? '' : v);
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -1381,7 +1453,7 @@
 
       const valid = items.filter(i => i && i.name && i.date);
       if (valid.length === 0) throw new Error('ไม่พบรายการที่นำเข้าได้ในไฟล์');
-      if (!confirm(`พบ ${valid.length} รายการ ต้องการนำเข้า (เพิ่มต่อจากข้อมูลเดิม) ใช่หรือไม่?`)) return;
+      if (!(await confirmDialog({ title: 'นำเข้าข้อมูล', message: `พบ ${valid.length} รายการ\nต้องการนำเข้า (เพิ่มต่อจากข้อมูลเดิม) ใช่หรือไม่?`, okText: 'นำเข้า', icon: '📥' }))) return;
 
       showState('loading');
       for (const i of valid) {
@@ -1398,9 +1470,9 @@
         });
       }
       await loadData();
-      alert(`นำเข้า ${valid.length} รายการสำเร็จ`);
+      showToast(`นำเข้า ${valid.length} รายการสำเร็จ`, 'success');
     } catch (err) {
-      alert('นำเข้าไม่สำเร็จ: ' + (err.message || err));
+      showToast('นำเข้าไม่สำเร็จ: ' + (err.message || err), 'error');
       await loadData();
     } finally {
       importFile.value = ''; // เคลียร์เพื่อให้เลือกไฟล์เดิมซ้ำได้
@@ -1503,7 +1575,9 @@
     }
   });
   document.getElementById('btn-logout').addEventListener('click', async () => {
-    if (_fb && confirm('ออกจากระบบ?')) await _fb.authMod.signOut(_fb.auth);
+    if (!_fb) return;
+    const ok = await confirmDialog({ title: 'ออกจากระบบ', message: 'ต้องการออกจากระบบใช่ไหม?', okText: 'ออกจากระบบ', danger: true, icon: '👋' });
+    if (ok) await _fb.authMod.signOut(_fb.auth);
   });
 
   /* =========================================================
