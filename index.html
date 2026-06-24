@@ -94,13 +94,19 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
         </button>
-        <!-- สำรอง / นำเข้าข้อมูล -->
-        <button id="btn-export" title="สำรองข้อมูล (ดาวน์โหลด)"
-          class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="สำรองข้อมูล">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-          </svg>
-        </button>
+        <!-- สำรอง / ส่งออกข้อมูล (เมนู) -->
+        <div class="relative">
+          <button id="btn-export" title="ส่งออก / สำรองข้อมูล"
+            class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="ส่งออกข้อมูล">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+          </button>
+          <div id="export-menu" class="hidden absolute right-0 mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-30 text-sm">
+            <button id="btn-export-json" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700">💾 สำรองเป็น JSON <span class="block text-xs text-gray-400">กู้คืน/นำเข้ากลับได้</span></button>
+            <button id="btn-export-csv" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700">📊 ส่งออก CSV <span class="block text-xs text-gray-400">เปิดใน Excel / Google ชีต</span></button>
+          </div>
+        </div>
         <button id="btn-import" title="นำเข้าข้อมูล (จากไฟล์สำรอง)"
           class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="นำเข้าข้อมูล">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -160,6 +166,16 @@
 
   <!-- ===================== MAIN: CARD LIST ===================== -->
   <main class="max-w-2xl mx-auto px-4 py-4 pb-28">
+    <!-- แท็บ รายการปัจจุบัน / ประวัติ -->
+    <div class="flex gap-2 mb-4">
+      <button data-view="active" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">
+        📋 รายการ
+      </button>
+      <button data-view="history" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">
+        ✅ ประวัติ
+      </button>
+    </div>
+
     <!-- Loading state -->
     <div id="loading-state" class="hidden text-center py-20">
       <svg class="animate-spin w-8 h-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -213,6 +229,12 @@
         <form id="item-form" class="px-5 py-4 space-y-4">
           <input type="hidden" id="item-id" />
 
+          <!-- เทมเพลตเพิ่มด่วน (แสดงเฉพาะตอนเพิ่มรายการใหม่) -->
+          <div id="quick-templates-wrap">
+            <label class="block text-sm font-medium text-gray-700 mb-1">⚡ เพิ่มด่วน <span class="text-gray-400 font-normal">(แตะเพื่อเติมอัตโนมัติ)</span></label>
+            <div id="quick-templates" class="flex flex-wrap gap-2"></div>
+          </div>
+
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อรายการ</label>
             <input id="item-name" type="text" required placeholder="เช่น ต่อภาษีรถยนต์"
@@ -226,6 +248,7 @@
               <option value="vehicle">🚗 ยานพาหนะ</option>
               <option value="document">📄 เอกสารส่วนตัว</option>
               <option value="service">📱 บริการ / แอป</option>
+              <option value="device">🔧 อุปกรณ์</option>
               <option value="appointment">📅 นัดหมายทั่วไป</option>
             </select>
           </div>
@@ -306,8 +329,20 @@
     vehicle:     { label: 'ยานพาหนะ',       icon: '🚗' },
     document:    { label: 'เอกสารส่วนตัว',   icon: '📄' },
     service:     { label: 'บริการ / แอป',    icon: '📱' },
+    device:      { label: 'อุปกรณ์',         icon: '🔧' },
     appointment: { label: 'นัดหมายทั่วไป',   icon: '📅' },
   };
+
+  /* เทมเพลตเพิ่มด่วน — กดแล้วเติมชื่อ/หมวด/ทำซ้ำให้อัตโนมัติ (ผู้ใช้เลือกวันที่เอง) */
+  const QUICK_TEMPLATES = [
+    { name: 'ต่อภาษีรถ + พ.ร.บ.',          category: 'vehicle', repeat: 'yearly' },
+    { name: 'เช็คแบตเตอรี่ 12V (e:HEV)',    category: 'vehicle', repeat: 'none' },
+    { name: 'เช็คชัตเตอร์กล้อง Sony',       category: 'device',  repeat: 'none' },
+    { name: 'บำรุงรักษาเครื่องปริ้นเตอร์',  category: 'device',  repeat: 'none' },
+    { name: 'ต่ออายุ Adobe',               category: 'service', repeat: 'yearly' },
+    { name: 'ต่ออายุ Canva',               category: 'service', repeat: 'yearly' },
+    { name: 'ต่ออายุ Google One',          category: 'service', repeat: 'yearly' },
+  ];
 
   /* =========================================================
      ⚙️  ตั้งค่า: วาง Web app URL ของ Google Apps Script ตรงนี้
@@ -426,16 +461,18 @@
         const payload = {
           name: item.name, category: item.category, date: item.date,
           repeat: item.repeat || 'none', note: item.note || '', image: item.image || '',
+          done: item.done || false, doneAt: item.doneAt || '',
           createdAt: new Date().toISOString(),
         };
         const ref = await addDoc(col(), payload);
         return { id: ref.id, ...payload };
       },
       async update(id, data) {
-        await updateDoc(doc(db, 'items', id), {
-          name: data.name, category: data.category, date: data.date,
-          repeat: data.repeat || 'none', note: data.note || '', image: data.image || '',
-        });
+        // อัปเดตเฉพาะ field ที่ส่งมา (รองรับการอัปเดตบางส่วน เช่น mark as done)
+        const allowed = ['name','category','date','repeat','note','image','done','doneAt'];
+        const payload = {};
+        allowed.forEach(k => { if (data[k] !== undefined) payload[k] = data[k]; });
+        await updateDoc(doc(db, 'items', id), payload);
       },
       async remove(id) {
         await deleteDoc(doc(db, 'items', id));
@@ -522,18 +559,24 @@
     return `เหลืออีก ${d} วัน`;
   }
 
-  // เลื่อนวันของรายการ "ทำซ้ำทุกปี" ไปปีถัดไป จนกว่าจะถึงวันนี้/อนาคต
-  function nextYearlyDate(dateStr) {
+  // บวกปีให้วันที่ (คืน YYYY-MM-DD)
+  function addYears(dateStr, n) {
     const d = new Date(dateStr);
-    while (daysLeft(d.toISOString().slice(0, 10)) < 0) {
-      d.setFullYear(d.getFullYear() + 1);
-    }
+    d.setFullYear(d.getFullYear() + n);
     return d.toISOString().slice(0, 10);
   }
 
+  // เลื่อนวันของรายการ "ทำซ้ำทุกปี" ไปปีถัดไป จนกว่าจะถึงวันนี้/อนาคต
+  function nextYearlyDate(dateStr) {
+    let s = dateStr;
+    while (daysLeft(s) < 0) s = addYears(s, 1);
+    return s;
+  }
+
   // ตรวจรายการที่ทำซ้ำทุกปีและเลยกำหนดแล้ว -> เลื่อนวันอัตโนมัติ + บันทึก
+  // (ข้ามรายการที่ทำเสร็จแล้ว/อยู่ในประวัติ)
   async function rolloverRecurring() {
-    const due = state.items.filter(i => i.repeat === 'yearly' && daysLeft(i.date) < 0);
+    const due = state.items.filter(i => i.repeat === 'yearly' && !i.done && daysLeft(i.date) < 0);
     for (const item of due) {
       const newDate = nextYearlyDate(item.date);
       await Store.update(item.id, {
@@ -558,6 +601,7 @@
     search: document.getElementById('search-input'),
     filterBar: document.getElementById('filter-bar'),
     group: document.getElementById('group-select'),
+    viewTabs: document.querySelectorAll('.view-tab'),
   };
 
   // State กลางของแอป
@@ -566,6 +610,7 @@
     search: '',             // คำค้นหา
     filter: 'all',          // หมวดหมู่ที่เลือก: all | vehicle | ...
     group: 'none',          // การจัดกลุ่ม: none | status | category
+    view: 'active',         // มุมมอง: active (รายการ) | history (ประวัติ)
   };
 
   // โหลดข้อมูลจาก backend (ยิง fetch จริงเฉพาะตอนนี้)
@@ -591,10 +636,13 @@
   // วาดผลจาก state ใน cache (ไม่ยิง fetch) — ใช้ตอนค้นหา/กรอง
   function render() {
     showState('list');
+    renderViewTabs();
 
-    // อัปเดต Dashboard จากข้อมูลทั้งหมด (ไม่ขึ้นกับตัวกรอง)
+    const isHistory = state.view === 'history';
+
+    // อัปเดต Dashboard จากรายการที่ยัง active เท่านั้น (ไม่นับที่ทำเสร็จแล้ว)
     let c = 0, w = 0, s = 0;
-    state.items.forEach(i => {
+    state.items.filter(i => !i.done).forEach(i => {
       const st = getStatus(i.date);
       if (st === 'critical') c++;
       else if (st === 'warning') w++;
@@ -604,29 +652,32 @@
     els.statWarning.textContent = w;
     els.statSafe.textContent = s;
 
-    // กรอง + ค้นหา (ค้นทั้งชื่อและโน้ต)
+    // กรองตามมุมมอง (active/history) + หมวดหมู่ + คำค้น (ชื่อ/โน้ต)
     const keyword = state.search.trim().toLowerCase();
     let items = state.items.filter(i => {
+      const matchView = isHistory ? i.done : !i.done;
       const matchCat = state.filter === 'all' || i.category === state.filter;
       const matchKw = !keyword ||
         (i.name || '').toLowerCase().includes(keyword) ||
         (i.note || '').toLowerCase().includes(keyword);
-      return matchCat && matchKw;
+      return matchView && matchCat && matchKw;
     });
 
-    // เรียง: ใกล้หมดอายุที่สุดขึ้นบนสุด (วันน้อย/ติดลบ มาก่อน)
-    items.sort((a, b) => daysLeft(a.date) - daysLeft(b.date));
+    // เรียง: ประวัติ -> ทำเสร็จล่าสุดก่อน, ปกติ -> ใกล้หมดอายุที่สุดก่อน
+    if (isHistory) items.sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+    else items.sort((a, b) => daysLeft(a.date) - daysLeft(b.date));
 
-    // Empty state (ปรับข้อความตามว่ากำลังกรองอยู่หรือไม่)
+    // Empty state
     const isFiltering = keyword || state.filter !== 'all';
     els.empty.classList.toggle('hidden', items.length > 0);
     if (items.length === 0) {
-      els.empty.querySelector('p').textContent =
-        isFiltering ? 'ไม่พบรายการที่ค้นหา' : 'ยังไม่มีรายการ';
+      els.empty.querySelector('p').textContent = isHistory
+        ? (isFiltering ? 'ไม่พบในประวัติ' : 'ยังไม่มีประวัติที่ทำเสร็จ')
+        : (isFiltering ? 'ไม่พบรายการที่ค้นหา' : 'ยังไม่มีรายการ');
     }
 
-    // วาดผล: แบบจัดกลุ่ม หรือ รายการเรียงปกติ
-    if (state.group === 'none' || items.length === 0) {
+    // วาดผล: ประวัติไม่จัดกลุ่ม / รายการปกติจัดกลุ่มได้
+    if (isHistory || state.group === 'none' || items.length === 0) {
       els.list.innerHTML = items.map(renderCard).join('');
     } else {
       els.list.innerHTML = groupItems(items).map(g => `
@@ -640,6 +691,15 @@
         </div>
       `).join('');
     }
+  }
+
+  // ปรับสไตล์แท็บ รายการ/ประวัติ ให้ตรงกับ state.view
+  function renderViewTabs() {
+    els.viewTabs.forEach(tab => {
+      const active = tab.dataset.view === state.view;
+      tab.className = 'view-tab flex-1 py-2 rounded-lg text-sm font-medium transition ' +
+        (active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50');
+    });
   }
 
   // จัดกลุ่มรายการตาม state.group -> [{label, items}]
@@ -688,20 +748,47 @@
 
   function renderCard(item) {
     const cat = CATEGORIES[item.category] || { label: item.category, icon: '🔖' };
+    const isDone = !!item.done;
     const status = getStatus(item.date);
     const style = STATUS_STYLE[status];
+    // รายการในประวัติใช้โทนเทา ไม่ไฮไลต์สีสถานะ
+    const border = isDone ? 'border-l-4 border-gray-300' : `${style.border} ${style.extra}`;
+
+    // ป้ายมุมขวา: ประวัติ -> เสร็จเมื่อ, ปกติ -> วันคงเหลือ
+    const tag = isDone
+      ? `<span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+           ✓ เสร็จ ${item.doneAt ? formatDate(item.doneAt) : ''}
+         </span>`
+      : `<span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${style.tagBg}">
+           <span class="w-1.5 h-1.5 rounded-full ${style.dot}"></span>${daysLeftText(item.date)}
+         </span>`;
+
+    // ปุ่มจัดการ: ประวัติ -> กู้คืน + ลบ, ปกติ -> ทำเสร็จ + แก้ไข + ลบ
+    const actions = isDone
+      ? `<button onclick="restoreItem('${item.id}')" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="กู้คืน" title="กู้คืนเป็นรายการ">
+           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h11a4 4 0 010 8h-1M3 10l4-4M3 10l4 4" /></svg>
+         </button>
+         <button onclick="deleteItem('${item.id}')" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" aria-label="ลบ">
+           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+         </button>`
+      : `<button onclick="markDone('${item.id}')" class="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg" aria-label="ทำเสร็จ" title="ทำเสร็จ / ต่ออายุแล้ว">
+           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+         </button>
+         <button onclick="editItem('${item.id}')" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="แก้ไข">
+           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+         </button>
+         <button onclick="deleteItem('${item.id}')" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" aria-label="ลบ">
+           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+         </button>`;
 
     return `
-      <div class="bg-white rounded-xl shadow-sm ${style.border} ${style.extra} p-4 flex items-start gap-3">
+      <div class="bg-white rounded-xl shadow-sm ${border} p-4 flex items-start gap-3 ${isDone ? 'opacity-80' : ''}">
         <div class="text-2xl leading-none mt-0.5">${cat.icon}</div>
 
         <div class="flex-1 min-w-0">
           <div class="flex items-start justify-between gap-2">
             <h3 class="font-semibold text-gray-800 truncate">${escapeHtml(item.name)}</h3>
-            <span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${style.tagBg}">
-              <span class="w-1.5 h-1.5 rounded-full ${style.dot}"></span>
-              ${daysLeftText(item.date)}
-            </span>
+            ${tag}
           </div>
 
           <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
@@ -731,18 +818,7 @@
             class="mt-2 w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer" />` : ''}
         </div>
 
-        <div class="flex flex-col gap-1 shrink-0">
-          <button onclick="editItem('${item.id}')" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="แก้ไข">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-          <button onclick="deleteItem('${item.id}')" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" aria-label="ลบ">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
+        <div class="flex flex-col gap-1 shrink-0">${actions}</div>
       </div>
     `;
   }
@@ -769,6 +845,7 @@
     currentImage: '', // เก็บ data URL ของรูปที่เลือก/มีอยู่
 
     open(item = null) {
+      const quickWrap = document.getElementById('quick-templates-wrap');
       if (item) {
         this.title.textContent = 'แก้ไขรายการ';
         this.fId.value = item.id;
@@ -778,11 +855,14 @@
         this.fRepeat.checked = item.repeat === 'yearly';
         this.fNote.value = item.note || '';
         this.setImage(item.image || '');
+        quickWrap.classList.add('hidden'); // ซ่อนเทมเพลตตอนแก้ไข
       } else {
         this.title.textContent = 'เพิ่มรายการใหม่';
         this.form.reset();
         this.fId.value = '';
         this.setImage('');
+        quickWrap.classList.remove('hidden');
+        renderQuickTemplates();
       }
       this.el.classList.remove('hidden');
       document.body.classList.add('modal-open');
@@ -822,8 +902,53 @@
     }
   };
 
+  // ทำเสร็จ -> ย้ายเข้าประวัติ. ถ้าเป็นรายการทำซ้ำทุกปี จะสร้างรายการของปีถัดไปให้ด้วย
+  window.markDone = async function (id) {
+    const item = state.items.find(i => i.id === id);
+    if (!item) return;
+    const today = new Date().toISOString().slice(0, 10);
+    await Store.update(id, {
+      name: item.name, category: item.category, date: item.date,
+      repeat: item.repeat || 'none', note: item.note || '', image: item.image || '',
+      done: true, doneAt: today,
+    });
+    // ทำซ้ำทุกปี -> สร้างรายการรอบถัดไปอัตโนมัติ
+    if (item.repeat === 'yearly') {
+      await Store.add({
+        name: item.name, category: item.category,
+        date: nextYearlyDate(addYears(item.date, 1)),
+        repeat: 'yearly', note: item.note || '', image: item.image || '',
+        done: false, doneAt: '',
+      });
+    }
+    await loadData();
+  };
+
+  // กู้คืนจากประวัติ -> กลับมาเป็นรายการปกติ
+  window.restoreItem = async function (id) {
+    const item = state.items.find(i => i.id === id);
+    if (!item) return;
+    await Store.update(id, {
+      name: item.name, category: item.category, date: item.date,
+      repeat: item.repeat || 'none', note: item.note || '', image: item.image || '',
+      done: false, doneAt: '',
+    });
+    await loadData();
+  };
+
   // ปุ่ม "ลองอีกครั้ง" ใน error state
   window.reload = loadData;
+
+  // วาดปุ่มเทมเพลตเพิ่มด่วน (คลิกแล้วเติมชื่อ/หมวด/ทำซ้ำ ให้ผู้ใช้เลือกแค่วันที่)
+  function renderQuickTemplates() {
+    const box = document.getElementById('quick-templates');
+    box.innerHTML = QUICK_TEMPLATES.map((t, idx) => {
+      const cat = CATEGORIES[t.category] || { icon: '🔖' };
+      return `<button type="button" data-tpl="${idx}"
+        class="text-xs px-2.5 py-1.5 rounded-full border border-gray-300 text-gray-600 hover:bg-blue-50 hover:border-blue-300">
+        ${cat.icon} ${escapeHtml(t.name)}</button>`;
+    }).join('');
+  }
 
   /* =========================================================
      EVENT BINDINGS
@@ -892,6 +1017,23 @@
   els.group.addEventListener('change', (e) => {
     state.group = e.target.value;
     render();
+  });
+
+  // แท็บ รายการ / ประวัติ
+  els.viewTabs.forEach(tab => tab.addEventListener('click', () => {
+    state.view = tab.dataset.view;
+    render();
+  }));
+
+  // คลิกเทมเพลตเพิ่มด่วน -> เติมฟอร์ม (event delegation)
+  document.getElementById('quick-templates').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-tpl]');
+    if (!btn) return;
+    const t = QUICK_TEMPLATES[+btn.dataset.tpl];
+    modal.fName.value = t.name;
+    modal.fCategory.value = t.category;
+    modal.fRepeat.checked = t.repeat === 'yearly';
+    modal.fDate.focus(); // ให้ผู้ใช้เลือกวันที่ต่อ
   });
 
   /* =========================================================
@@ -966,26 +1108,60 @@
   applyThemeIcon();
 
   /* =========================================================
-     สำรอง / นำเข้าข้อมูล (Export / Import JSON)
+     สำรอง / นำเข้าข้อมูล (Export JSON / CSV, Import JSON)
      ========================================================= */
-  document.getElementById('btn-export').addEventListener('click', () => {
+  const exportMenu = document.getElementById('export-menu');
+  document.getElementById('btn-export').addEventListener('click', (e) => {
+    e.stopPropagation();
+    exportMenu.classList.toggle('hidden');
+  });
+  // ปิดเมนูเมื่อคลิกที่อื่น
+  document.addEventListener('click', () => exportMenu.classList.add('hidden'));
+
+  // ดาวน์โหลดไฟล์ทั่วไป
+  function downloadFile(content, filename, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // สำรองเป็น JSON (นำเข้ากลับได้ครบ รวมรูป)
+  document.getElementById('btn-export-json').addEventListener('click', () => {
     if (state.items.length === 0) { alert('ยังไม่มีข้อมูลให้สำรอง'); return; }
     const payload = {
       app: 'expiry-reminder',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       items: state.items.map(i => ({
         name: i.name, category: i.category, date: i.date, repeat: i.repeat || 'none',
-        note: i.note || '', image: i.image || '',
+        note: i.note || '', image: i.image || '', done: !!i.done, doneAt: i.doneAt || '',
       })),
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `backup-reminder-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(JSON.stringify(payload, null, 2),
+      `backup-reminder-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+  });
+
+  // ส่งออก CSV (เปิดใน Excel / Google ชีต) — ไม่รวมรูปเพราะใหญ่เกินไป
+  document.getElementById('btn-export-csv').addEventListener('click', () => {
+    if (state.items.length === 0) { alert('ยังไม่มีข้อมูลให้ส่งออก'); return; }
+    const esc = (v) => {
+      const s = String(v == null ? '' : v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const headers = ['ชื่อรายการ', 'หมวดหมู่', 'วันที่กำหนด', 'ทำซ้ำทุกปี', 'จำนวนวันคงเหลือ', 'สถานะ', 'โน้ต'];
+    const rows = state.items.map(i => {
+      const cat = (CATEGORIES[i.category] || {}).label || i.category;
+      const repeat = i.repeat === 'yearly' ? 'ใช่' : 'ไม่';
+      const status = i.done ? `เสร็จแล้ว (${i.doneAt || ''})` : daysLeftText(i.date);
+      const left = i.done ? '' : daysLeft(i.date);
+      return [i.name, cat, formatDate(i.date), repeat, left, status, i.note || ''].map(esc).join(',');
+    });
+    // ใส่ BOM (U+FEFF) เพื่อให้ Excel อ่านภาษาไทยถูก
+    const BOM = String.fromCharCode(0xFEFF);
+    const csv = BOM + [headers.join(','), ...rows].join('\r\n');
+    downloadFile(csv, `reminder-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
   });
 
   const importFile = document.getElementById('import-file');
@@ -1011,6 +1187,8 @@
           repeat: i.repeat === 'yearly' ? 'yearly' : 'none',
           note: i.note ? String(i.note) : '',
           image: typeof i.image === 'string' ? i.image : '',
+          done: !!i.done,
+          doneAt: i.doneAt ? String(i.doneAt) : '',
         });
       }
       await loadData();

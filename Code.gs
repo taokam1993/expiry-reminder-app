@@ -18,6 +18,8 @@
  *        F1: note
  *        G1: image
  *        H1: createdAt
+ *        I1: done
+ *        J1: doneAt
  *
  *     หมายเหตุ:
  *       - date เก็บรูปแบบข้อความ YYYY-MM-DD (แนะนำให้ตั้ง format
@@ -41,7 +43,7 @@
  */
 
 var SHEET_NAME = 'Data';
-var HEADERS = ['id', 'name', 'category', 'date', 'repeat', 'note', 'image', 'createdAt'];
+var HEADERS = ['id', 'name', 'category', 'date', 'repeat', 'note', 'image', 'createdAt', 'done', 'doneAt'];
 
 /* -----------------------------------------------------------
  *  GET  -> ใช้สำหรับ "อ่านข้อมูลทั้งหมด"  (action=list)
@@ -114,6 +116,8 @@ function getAllItems() {
         note:      r[5] ? String(r[5]) : '',
         image:     r[6] ? String(r[6]) : '',
         createdAt: r[7] ? String(r[7]) : '',
+        done:      r[8] === true || r[8] === 'true' || r[8] === 'TRUE',
+        doneAt:    r[9] ? String(r[9]) : '',
       };
     });
 }
@@ -129,9 +133,12 @@ function addItem(item) {
     note: item.note || '',
     image: item.image || '',
     createdAt: new Date().toISOString(),
+    done: item.done || false,
+    doneAt: item.doneAt || '',
   };
   sheet.appendRow([record.id, record.name, record.category, record.date,
-                   record.repeat, record.note, record.image, record.createdAt]);
+                   record.repeat, record.note, record.image, record.createdAt,
+                   record.done, record.doneAt]);
   return record;
 }
 
@@ -140,19 +147,19 @@ function updateItem(id, data) {
   var rowIndex = findRowById(sheet, id);
   if (rowIndex === -1) throw new Error('ไม่พบรายการ id: ' + id);
 
-  // อัปเดต name, category, date, repeat, note, image (คอลัมน์ B–G)
-  sheet.getRange(rowIndex, 2).setValue(data.name);
-  sheet.getRange(rowIndex, 3).setValue(data.category);
-  sheet.getRange(rowIndex, 4).setValue(data.date);
-  sheet.getRange(rowIndex, 5).setValue(data.repeat || 'none');
-  sheet.getRange(rowIndex, 6).setValue(data.note || '');
-  sheet.getRange(rowIndex, 7).setValue(data.image || '');
+  // อัปเดตเฉพาะ field ที่ส่งมา (รองรับอัปเดตบางส่วน เช่น mark as done)
+  // คอลัมน์: B=name C=category D=date E=repeat F=note G=image I=done J=doneAt
+  var map = { name: 2, category: 3, date: 4, repeat: 5, note: 6, image: 7, done: 9, doneAt: 10 };
+  Object.keys(map).forEach(function (k) {
+    if (data[k] !== undefined) sheet.getRange(rowIndex, map[k]).setValue(data[k]);
+  });
 
   var row = sheet.getRange(rowIndex, 1, 1, HEADERS.length).getValues()[0];
   return {
     id: String(row[0]), name: String(row[1]), category: String(row[2]),
     date: normalizeDate(row[3]), repeat: String(row[4]),
     note: String(row[5]), image: String(row[6]), createdAt: String(row[7]),
+    done: row[8] === true, doneAt: row[9] ? String(row[9]) : '',
   };
 }
 
