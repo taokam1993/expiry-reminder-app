@@ -78,6 +78,7 @@ async function fetchItems(idToken) {
     return {
       name: get('name') || '(ไม่มีชื่อ)',
       date: get('date') || '',
+      category: get('category') || '',
       repeat: get('repeat') || 'none',
       done: get('done') === true,
     };
@@ -85,19 +86,78 @@ async function fetchItems(idToken) {
 }
 
 // ---------- 3) ส่งข้อความเข้า LINE ----------
-async function sendLine(text) {
+async function sendLine(message) {
   const endpoint = LINE_USER_ID
     ? 'https://api.line.me/v2/bot/message/push'
     : 'https://api.line.me/v2/bot/message/broadcast';
   const body = LINE_USER_ID
-    ? { to: LINE_USER_ID, messages: [{ type: 'text', text }] }
-    : { messages: [{ type: 'text', text }] };
+    ? { to: LINE_USER_ID, messages: [message] }
+    : { messages: [message] };
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LINE_TOKEN}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`ส่ง LINE ไม่สำเร็จ (${res.status}): ${await res.text()}`);
+}
+
+// ไอคอนหมวดหมู่ (ให้ตรงกับในแอป)
+const CAT_ICON = { vehicle:'🚗', document:'📄', service:'📱', device:'🔧', appointment:'📅' };
+
+// สร้าง Flex Message การ์ดสวยๆ
+function buildFlex(due, today) {
+  const hasCritical = due.some(i => i.d <= 3);
+  const headerColor = hasCritical ? '#DC2626' : '#2563EB';      // แดงถ้ามีรายการด่วน
+  const subColor    = hasCritical ? '#FECACA' : '#DBEAFE';
+
+  // แต่ละรายการ = แถวเดียว มีแถบสีซ้าย + ชื่อ/วันที่ + ป้ายวันคงเหลือ
+  const rows = [];
+  due.forEach((i, idx) => {
+    const color = i.d <= 3 ? '#DC2626' : '#F59E0B';             // แดง=ด่วน, เหลือง=ใกล้
+    if (idx > 0) rows.push({ type: 'separator', margin: 'md', color: '#F3F4F6' });
+    rows.push({
+      type: 'box', layout: 'horizontal', spacing: 'md', margin: idx === 0 ? 'none' : 'md',
+      contents: [
+        // แถบสีบอกความเร่งด่วน
+        { type: 'box', layout: 'vertical', width: '6px', cornerRadius: '3px',
+          backgroundColor: color, contents: [{ type: 'filler' }] },
+        // ชื่อ + วันที่
+        { type: 'box', layout: 'vertical', flex: 1, spacing: 'xs', contents: [
+            { type: 'text', text: `${CAT_ICON[i.category] || '🔖'} ${i.name}`,
+              weight: 'bold', size: 'sm', color: '#1F2937', wrap: true },
+            { type: 'text', text: `ครบกำหนด ${formatThai(i.date)}`, size: 'xs', color: '#9CA3AF' },
+        ]},
+        // ป้ายวันคงเหลือ
+        { type: 'text', text: leftText(i.d), size: 'xs', weight: 'bold',
+          color: color, align: 'end', gravity: 'center', flex: 0 },
+      ],
+    });
+  });
+
+  return {
+    type: 'flex',
+    altText: `🔔 แจ้งเตือน: ${due.length} รายการใกล้ครบกำหนด`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: headerColor, paddingAll: '16px', spacing: 'xs',
+        contents: [
+          { type: 'text', text: '🔔 แจ้งเตือนรายการ', color: '#FFFFFF', weight: 'bold', size: 'lg' },
+          { type: 'text', text: `ใกล้ครบกำหนด ${due.length} รายการ`, color: subColor, size: 'xs' },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'none', contents: rows,
+      },
+      footer: {
+        type: 'box', layout: 'vertical', paddingAll: '12px', paddingTop: 'none',
+        contents: [
+          { type: 'button', style: 'primary', color: headerColor, height: 'sm',
+            action: { type: 'uri', label: '📱 เปิดแอป', uri: 'https://taokam1993.github.io/expiry-reminder-app/' } },
+        ],
+      },
+    },
+  };
 }
 
 // ---------- main ----------
@@ -119,13 +179,7 @@ async function sendLine(text) {
     return;
   }
 
-  const lines = due.map(i => {
-    const emoji = i.d <= 3 ? '🔴' : '🟡';
-    return `${emoji} ${i.name} — ${leftText(i.d)} (${formatThai(i.date)})`;
-  });
-  const text = `🔔 แจ้งเตือนรายการใกล้ครบกำหนด\n\n${lines.join('\n')}\n\n📱 ดูทั้งหมด: https://taokam1993.github.io/expiry-reminder-app/`;
-
-  await sendLine(text);
+  await sendLine(buildFlex(due, today));
   console.log(`ส่งแจ้งเตือน ${due.length} รายการเรียบร้อย (${today})`);
 })().catch(err => {
   console.error(err);
