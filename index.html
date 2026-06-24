@@ -229,11 +229,30 @@
 
   <!-- ===================== MAIN: CARD LIST ===================== -->
   <main class="max-w-2xl mx-auto px-4 py-4 pb-28">
-    <!-- แท็บ รายการ / ปฏิทิน / ประวัติ -->
-    <div class="flex gap-2 mb-4">
-      <button data-view="active" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">📋 รายการ</button>
-      <button data-view="calendar" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">📅 ปฏิทิน</button>
-      <button data-view="history" class="view-tab flex-1 py-2 rounded-lg text-sm font-medium transition">✅ ประวัติ</button>
+    <!-- แท็บ รายการ / ทูดู / ปฏิทิน / ประวัติ -->
+    <div class="flex gap-1.5 mb-4">
+      <button data-view="active" class="view-tab flex-1 py-2 rounded-lg text-xs font-medium transition">📋 รายการ</button>
+      <button data-view="todo" class="view-tab flex-1 py-2 rounded-lg text-xs font-medium transition">📝 ทูดู</button>
+      <button data-view="calendar" class="view-tab flex-1 py-2 rounded-lg text-xs font-medium transition">📅 ปฏิทิน</button>
+      <button data-view="history" class="view-tab flex-1 py-2 rounded-lg text-xs font-medium transition">✅ ประวัติ</button>
+    </div>
+
+    <!-- มุมมอง To-Do -->
+    <div id="todo-view" class="hidden">
+      <div class="flex gap-2 mb-3">
+        <input id="todo-input" type="text" maxlength="200" placeholder="เพิ่มงานที่ต้องทำ..."
+          class="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+        <button id="todo-add" class="px-4 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700">เพิ่ม</button>
+      </div>
+      <div id="todo-list" class="space-y-2"></div>
+      <div id="todo-empty" class="hidden text-center py-16">
+        <div class="text-5xl mb-3">📝</div>
+        <p class="text-gray-500 font-medium">ยังไม่มีงานที่ต้องทำ</p>
+        <p class="text-gray-400 text-sm mt-1">พิมพ์ด้านบนแล้วกดเพิ่ม</p>
+      </div>
+      <div class="mt-4 text-right">
+        <button id="todo-clear" class="hidden text-xs text-red-500 hover:underline">ล้างงานที่เสร็จแล้ว</button>
+      </div>
     </div>
 
     <!-- มุมมองปฏิทิน -->
@@ -629,6 +648,28 @@
       meta[key] = value;
       localStorage.setItem('reminder_meta', JSON.stringify(meta));
     },
+    // ----- To-Do -----
+    async getTodos() {
+      const raw = localStorage.getItem('reminder_todos');
+      return raw ? JSON.parse(raw) : [];
+    },
+    async _saveTodos(todos) { localStorage.setItem('reminder_todos', JSON.stringify(todos)); },
+    async addTodo(text) {
+      const todos = await this.getTodos();
+      const todo = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), text, done: false, createdAt: new Date().toISOString() };
+      todos.push(todo);
+      await this._saveTodos(todos);
+      return todo;
+    },
+    async updateTodo(id, data) {
+      const todos = await this.getTodos();
+      const idx = todos.findIndex(t => t.id === id);
+      if (idx !== -1) { todos[idx] = { ...todos[idx], ...data }; await this._saveTodos(todos); }
+    },
+    async removeTodo(id) {
+      const todos = (await this.getTodos()).filter(t => t.id !== id);
+      await this._saveTodos(todos);
+    },
   };
 
   // --- โหมด Google Apps Script ---
@@ -655,6 +696,10 @@
     async remove(id)       { return this._post('delete', { id }); },
     async getMeta()        { return undefined; }, // GAS ยังไม่รองรับ meta
     async setMeta()        { /* no-op */ },
+    async getTodos()       { return []; },
+    async addTodo()        { return null; },
+    async updateTodo()     { /* no-op */ },
+    async removeTodo()     { /* no-op */ },
   };
 
   // --- โหมด Firebase (Cloud Firestore + Google Login) ---
@@ -709,6 +754,24 @@
       },
       async setMeta(key, value) {
         await setDoc(metaDoc(), { [key]: value }, { merge: true });
+      },
+      // ----- To-Do (users/{uid}/todos) -----
+      async getTodos() {
+        const snap = await getDocs(collection(db, 'users', uid, 'todos'));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      },
+      async addTodo(text) {
+        const payload = { text, done: false, createdAt: new Date().toISOString() };
+        const ref = await addDoc(collection(db, 'users', uid, 'todos'), payload);
+        return { id: ref.id, ...payload };
+      },
+      async updateTodo(id, data) {
+        const payload = {};
+        ['text', 'done'].forEach(k => { if (data[k] !== undefined) payload[k] = data[k]; });
+        await updateDoc(doc(db, 'users', uid, 'todos', id), payload);
+      },
+      async removeTodo(id) {
+        await deleteDoc(doc(db, 'users', uid, 'todos', id));
       },
       // อ่านข้อมูลจาก collection กลางเดิม (ก่อนมีระบบล็อกอิน) — ใช้ย้ายข้อมูลครั้งเดียว
       async _legacyItems() {
@@ -860,7 +923,8 @@
     search: '',             // คำค้นหา
     filter: 'all',          // หมวดหมู่ที่เลือก: all | vehicle | ...
     group: 'none',          // การจัดกลุ่ม: none | status | category
-    view: 'active',         // มุมมอง: active | calendar | history
+    view: 'active',         // มุมมอง: active | todo | calendar | history
+    todos: [],              // รายการ To-Do (cache)
     selectMode: false,      // โหมดเลือกหลายรายการ
     selected: new Set(),    // id ที่เลือกไว้
     calMonth: (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(), // เดือนที่แสดงในปฏิทิน
@@ -872,6 +936,7 @@
     showState('loading');
     try {
       state.items = await Store.getAll();
+      state.todos = await Store.getTodos();
       await rolloverRecurring(); // เลื่อนวันรายการที่ทำซ้ำทุกปีให้เป็นปัจจุบัน
       render();
     } catch (err) {
@@ -903,8 +968,25 @@
     els.statWarning.textContent = w;
     els.statSafe.textContent = s;
 
-    // มุมมองปฏิทิน — แยกออกจากรายการ
+    // ซ่อนทุกมุมมองพิเศษก่อน
     const calView = document.getElementById('calendar-view');
+    const todoView = document.getElementById('todo-view');
+    const fab = document.getElementById('fab');
+    calView.classList.add('hidden');
+    todoView.classList.add('hidden');
+
+    // มุมมอง To-Do
+    if (state.view === 'todo') {
+      els.list.classList.add('hidden'); els.empty.classList.add('hidden');
+      els.loading.classList.add('hidden'); els.error.classList.add('hidden');
+      todoView.classList.remove('hidden');
+      if (!state.selectMode) fab.classList.add('hidden'); // ทูดูมีปุ่มเพิ่มของตัวเอง
+      renderTodos();
+      return;
+    }
+    if (!state.selectMode) fab.classList.remove('hidden');
+
+    // มุมมองปฏิทิน — แยกออกจากรายการ
     if (state.view === 'calendar') {
       els.list.classList.add('hidden');
       els.empty.classList.add('hidden');
@@ -914,7 +996,6 @@
       renderCalendar();
       return;
     }
-    calView.classList.add('hidden');
     showState('list');
 
     const isHistory = state.view === 'history';
@@ -1020,6 +1101,50 @@
   }
 
   window.selectCalDay = function (ds) { state.calDay = ds; renderCalendar(); };
+
+  /* =========================================================
+     To-Do List
+     ========================================================= */
+  function renderTodos() {
+    const box = document.getElementById('todo-list');
+    const empty = document.getElementById('todo-empty');
+    const clearBtn = document.getElementById('todo-clear');
+    // ยังไม่เสร็จขึ้นก่อน, ในกลุ่มเรียงใหม่สุดบน
+    const todos = [...state.todos].sort((a, b) =>
+      (a.done ? 1 : 0) - (b.done ? 1 : 0) || (b.createdAt || '').localeCompare(a.createdAt || ''));
+    empty.classList.toggle('hidden', todos.length > 0);
+    clearBtn.classList.toggle('hidden', !todos.some(t => t.done));
+    box.innerHTML = todos.map(t => `
+      <div class="flex items-center gap-3 bg-white rounded-xl shadow-sm p-3">
+        <button onclick="toggleTodo('${t.id}')" class="shrink-0 w-6 h-6 rounded-full border-2 ${t.done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'} flex items-center justify-center text-white" aria-label="ติ๊กเสร็จ">
+          ${t.done ? '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+        </button>
+        <span class="flex-1 text-sm break-words ${t.done ? 'line-through text-gray-400' : 'text-gray-800'}">${escapeHtml(t.text)}</span>
+        <button onclick="deleteTodo('${t.id}')" class="shrink-0 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" aria-label="ลบ">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        </button>
+      </div>`).join('');
+  }
+
+  window.toggleTodo = async function (id) {
+    const t = state.todos.find(x => x.id === id);
+    if (!t) return;
+    t.done = !t.done; renderTodos();          // อัปเดตทันที (optimistic)
+    await Store.updateTodo(id, { done: t.done });
+  };
+  window.deleteTodo = async function (id) {
+    state.todos = state.todos.filter(x => x.id !== id); renderTodos();
+    await Store.removeTodo(id);
+  };
+  async function addTodoFromInput() {
+    const inp = document.getElementById('todo-input');
+    const text = inp.value.trim();
+    if (!text) return;
+    inp.value = '';
+    const t = await Store.addTodo(text);
+    if (t) state.todos.push(t); else state.todos = await Store.getTodos();
+    renderTodos();
+  }
 
   // จัดกลุ่มรายการตาม state.group -> [{label, items}]
   function groupItems(items) {
@@ -1530,6 +1655,21 @@
   document.getElementById('cal-next').addEventListener('click', () => {
     state.calMonth = new Date(state.calMonth.getFullYear(), state.calMonth.getMonth() + 1, 1);
     renderCalendar();
+  });
+
+  // To-Do: เพิ่ม / กด Enter / ล้างที่เสร็จแล้ว
+  document.getElementById('todo-add').addEventListener('click', addTodoFromInput);
+  document.getElementById('todo-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addTodoFromInput(); }
+  });
+  document.getElementById('todo-clear').addEventListener('click', async () => {
+    const done = state.todos.filter(t => t.done);
+    if (done.length === 0) return;
+    if (!(await confirmDialog({ title: 'ล้างงานที่เสร็จ', message: `ลบ ${done.length} งานที่เสร็จแล้ว?`, okText: 'ลบ', danger: true, icon: '🗑️' }))) return;
+    for (const t of done) await Store.removeTodo(t.id);
+    state.todos = state.todos.filter(t => !t.done);
+    renderTodos();
+    showToast('ล้างงานที่เสร็จแล้ว', 'success');
   });
 
   // คลิกเทมเพลตเพิ่มด่วน -> เติมฟอร์ม (event delegation)
