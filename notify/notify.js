@@ -70,6 +70,20 @@ async function fetchItems(db) {
   });
 }
 
+// ---------- อ่านงานที่ต้องทำ users/{OWNER_UID}/todos ----------
+async function fetchTodos(db) {
+  const snap = await db.collection('users').doc(OWNER_UID).collection('todos').get();
+  return snap.docs.map(doc => {
+    const d = doc.data() || {};
+    return {
+      text: d.text || '(ไม่มีชื่อ)',
+      date: d.date || '',
+      priority: typeof d.priority === 'number' ? d.priority : 4,
+      done: d.done === true,
+    };
+  });
+}
+
 // ---------- 3) ส่งข้อความเข้า LINE ----------
 async function sendLine(message) {
   const endpoint = LINE_USER_ID
@@ -88,51 +102,100 @@ async function sendLine(message) {
 
 // ไอคอนหมวดหมู่ (ให้ตรงกับในแอป)
 const CAT_ICON = { vehicle:'🚗', document:'📄', service:'📱', device:'🔧', appointment:'📅' };
+// สี + อิโมจิตามลำดับความสำคัญ (Eisenhower) ให้ตรงกับแอป
+const PRI_EMOJI = { 1:'🔴', 2:'🟡', 3:'🔵', 4:'⚪' };
+const PRI_COLOR = { 1:'#DC2626', 2:'#F59E0B', 3:'#3B82F6', 4:'#9CA3AF' };
 
-// สร้าง Flex Message การ์ดสวยๆ
-function buildFlex(due, today) {
-  const hasCritical = due.some(i => i.d <= 3);
-  const headerColor = hasCritical ? '#DC2626' : '#2563EB';      // แดงถ้ามีรายการด่วน
+// แถวรายการแจ้งเตือน (reminder)
+function reminderRow(i, idx) {
+  const color = i.d <= 3 ? '#DC2626' : '#F59E0B';              // แดง=ด่วน, เหลือง=ใกล้
+  return {
+    type: 'box', layout: 'horizontal', spacing: 'md', margin: idx === 0 ? 'none' : 'md',
+    contents: [
+      { type: 'box', layout: 'vertical', width: '6px', cornerRadius: '3px',
+        backgroundColor: color, contents: [{ type: 'filler' }] },
+      { type: 'box', layout: 'vertical', flex: 1, spacing: 'xs', contents: [
+          { type: 'text', text: `${CAT_ICON[i.category] || '🔖'} ${i.name}`,
+            weight: 'bold', size: 'sm', color: '#1F2937', wrap: true },
+          { type: 'text', text: `ครบกำหนด ${formatThai(i.date)}`, size: 'xs', color: '#9CA3AF' },
+      ]},
+      { type: 'text', text: leftText(i.d), size: 'xs', weight: 'bold',
+        color: color, align: 'end', gravity: 'center', flex: 0 },
+    ],
+  };
+}
+
+// แถวงานที่ต้องทำ (todo)
+function todoRow(t, idx) {
+  const color = PRI_COLOR[t.priority] || PRI_COLOR[4];
+  const status = t.d < 0 ? `เลยกำหนด ${Math.abs(t.d)} วัน` : (t.d === 0 ? 'วันนี้' : '');
+  const sub = [];
+  if (t.date) sub.push({ type: 'text', text: `📅 ${formatThai(t.date)}`, size: 'xs', color: '#9CA3AF', flex: 1, gravity: 'center' });
+  if (status) sub.push({ type: 'text', text: status, size: 'xs', weight: 'bold', color: color, align: 'end', gravity: 'center', flex: 0 });
+  return {
+    type: 'box', layout: 'horizontal', spacing: 'md', margin: idx === 0 ? 'none' : 'md',
+    contents: [
+      { type: 'box', layout: 'vertical', width: '6px', cornerRadius: '3px',
+        backgroundColor: color, contents: [{ type: 'filler' }] },
+      { type: 'box', layout: 'vertical', flex: 1, spacing: 'xs', contents: [
+          { type: 'text', text: `${PRI_EMOJI[t.priority] || '⚪'} ${t.text}`,
+            weight: 'bold', size: 'sm', color: '#1F2937', wrap: true },
+          ...(sub.length ? [{ type: 'box', layout: 'horizontal', contents: sub }] : []),
+      ]},
+    ],
+  };
+}
+
+// หัวข้อ section ในเนื้อข้อความ
+function sectionTitle(text, margin) {
+  return { type: 'text', text, weight: 'bold', size: 'sm', color: '#6B7280', margin: margin || 'none' };
+}
+
+// สร้าง Flex Message การ์ดสวยๆ (รวมแจ้งเตือน + งานที่ต้องทำวันนี้)
+function buildFlex(due, todos, today) {
+  const hasCritical = due.some(i => i.d <= 3) || todos.some(t => t.d <= 0 && t.priority <= 1);
+  const headerColor = hasCritical ? '#DC2626' : '#2563EB';
   const subColor    = hasCritical ? '#FECACA' : '#DBEAFE';
 
-  // แต่ละรายการ = แถวเดียว มีแถบสีซ้าย + ชื่อ/วันที่ + ป้ายวันคงเหลือ
-  const rows = [];
-  due.forEach((i, idx) => {
-    const color = i.d <= 3 ? '#DC2626' : '#F59E0B';             // แดง=ด่วน, เหลือง=ใกล้
-    if (idx > 0) rows.push({ type: 'separator', margin: 'md', color: '#F3F4F6' });
-    rows.push({
-      type: 'box', layout: 'horizontal', spacing: 'md', margin: idx === 0 ? 'none' : 'md',
-      contents: [
-        // แถบสีบอกความเร่งด่วน
-        { type: 'box', layout: 'vertical', width: '6px', cornerRadius: '3px',
-          backgroundColor: color, contents: [{ type: 'filler' }] },
-        // ชื่อ + วันที่
-        { type: 'box', layout: 'vertical', flex: 1, spacing: 'xs', contents: [
-            { type: 'text', text: `${CAT_ICON[i.category] || '🔖'} ${i.name}`,
-              weight: 'bold', size: 'sm', color: '#1F2937', wrap: true },
-            { type: 'text', text: `ครบกำหนด ${formatThai(i.date)}`, size: 'xs', color: '#9CA3AF' },
-        ]},
-        // ป้ายวันคงเหลือ
-        { type: 'text', text: leftText(i.d), size: 'xs', weight: 'bold',
-          color: color, align: 'end', gravity: 'center', flex: 0 },
-      ],
+  const body = [];
+
+  if (todos.length) {
+    body.push(sectionTitle(`📝 งานวันนี้ (${todos.length})`));
+    todos.forEach((t, idx) => {
+      if (idx > 0) body.push({ type: 'separator', margin: 'md', color: '#F3F4F6' });
+      body.push(todoRow(t, idx));
     });
-  });
+  }
+
+  if (due.length) {
+    if (todos.length) body.push({ type: 'separator', margin: 'lg', color: '#E5E7EB' });
+    body.push(sectionTitle(`🔔 ใกล้ครบกำหนด (${due.length})`, todos.length ? 'lg' : 'none'));
+    due.forEach((i, idx) => {
+      if (idx > 0) body.push({ type: 'separator', margin: 'md', color: '#F3F4F6' });
+      body.push(reminderRow(i, idx));
+    });
+  }
+
+  // ข้อความสรุปบนหัว
+  const parts = [];
+  if (todos.length) parts.push(`${todos.length} งาน`);
+  if (due.length) parts.push(`${due.length} แจ้งเตือน`);
+  const summary = parts.join(' · ');
 
   return {
     type: 'flex',
-    altText: `🔔 แจ้งเตือน: ${due.length} รายการใกล้ครบกำหนด`,
+    altText: `🌤️ สรุปวันนี้: ${summary}`,
     contents: {
       type: 'bubble',
       header: {
         type: 'box', layout: 'vertical', backgroundColor: headerColor, paddingAll: '16px', spacing: 'xs',
         contents: [
-          { type: 'text', text: '🔔 แจ้งเตือนรายการ', color: '#FFFFFF', weight: 'bold', size: 'lg' },
-          { type: 'text', text: `ใกล้ครบกำหนด ${due.length} รายการ`, color: subColor, size: 'xs' },
+          { type: 'text', text: '🌤️ สรุปสิ่งที่ต้องทำวันนี้', color: '#FFFFFF', weight: 'bold', size: 'lg' },
+          { type: 'text', text: `${formatThai(today)} · ${summary}`, color: subColor, size: 'xs' },
         ],
       },
       body: {
-        type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'none', contents: rows,
+        type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'none', contents: body,
       },
       footer: {
         type: 'box', layout: 'vertical', paddingAll: '12px', paddingTop: 'none',
@@ -151,23 +214,30 @@ function buildFlex(due, today) {
 
   const today = todayBangkok();
   const db = initAdmin();
-  const items = await fetchItems(db);
+  const [items, todosRaw] = await Promise.all([fetchItems(db), fetchTodos(db)]);
 
-  // หาเฉพาะที่ยังไม่ทำเสร็จ และถึงช่วงเตือนล่วงหน้าของรายการนั้น (หรือเลยกำหนด)
-  // ใช้ leadDays รายรายการ ถ้าไม่มีให้ใช้ค่าเริ่มต้น THRESHOLD_DAYS
+  // แจ้งเตือน: ยังไม่ทำเสร็จ + ถึงช่วงเตือนล่วงหน้า (leadDays รายรายการ) หรือเลยกำหนด
   const due = items
     .filter(i => i.date && !i.done)
     .map(i => ({ ...i, d: daysLeft(i.date, today), lead: i.leadDays || THRESHOLD_DAYS }))
     .filter(i => i.d <= i.lead)
     .sort((a, b) => a.d - b.d);
 
-  if (due.length === 0) {
-    console.log('ไม่มีรายการที่ต้องแจ้งเตือนวันนี้ (' + today + ')');
+  // งานที่ต้องทำวันนี้: ยังไม่เสร็จ + มีกำหนด + ครบกำหนดวันนี้หรือเลยกำหนด
+  // เรียง: เลยกำหนด/ใกล้สุดก่อน แล้วตามลำดับความสำคัญ
+  const todos = todosRaw
+    .filter(t => t.date && !t.done)
+    .map(t => ({ ...t, d: daysLeft(t.date, today) }))
+    .filter(t => t.d <= 0)
+    .sort((a, b) => a.d - b.d || a.priority - b.priority);
+
+  if (due.length === 0 && todos.length === 0) {
+    console.log('ไม่มีรายการ/งานที่ต้องแจ้งเตือนวันนี้ (' + today + ')');
     return;
   }
 
-  await sendLine(buildFlex(due, today));
-  console.log(`ส่งแจ้งเตือน ${due.length} รายการเรียบร้อย (${today})`);
+  await sendLine(buildFlex(due, todos, today));
+  console.log(`ส่งแจ้งเตือนเรียบร้อย: ${todos.length} งาน, ${due.length} แจ้งเตือน (${today})`);
 })().catch(err => {
   console.error(err);
   process.exit(1);
