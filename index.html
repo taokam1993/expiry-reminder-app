@@ -907,6 +907,17 @@
   // ชื่อเดือนภาษาไทยแบบย่อ
   const THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
+  // ชื่อวัน + สีประจำวันแบบไทย (อา=แดง จ=เหลือง อ=ชมพู พ=เขียว พฤ=ส้ม ศ=ฟ้า ส=ม่วง)
+  const THAI_DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const THAI_DOW_TEXT = ['text-red-500','text-yellow-500','text-pink-500','text-green-500','text-orange-500','text-sky-500','text-purple-500'];
+  const THAI_DOW_DOT  = ['bg-red-500','bg-yellow-400','bg-pink-500','bg-green-500','bg-orange-500','bg-sky-500','bg-purple-500'];
+
+  // ป้ายชื่อวันพร้อมสีประจำวัน เช่น "● วันศุกร์"
+  function thaiDayChip(dateStr) {
+    const dow = new Date(dateStr).getDay();
+    return `<span class="inline-flex items-center gap-1 ${THAI_DOW_TEXT[dow]} font-semibold"><span class="w-1.5 h-1.5 rounded-full ${THAI_DOW_DOT[dow]}"></span>วัน${THAI_DOW[dow]}</span>`;
+  }
+
   // จัด format วันที่แบบไทย + ปี พ.ศ. เช่น "24 มิ.ย. 2569"
   function formatDate(dateStr) {
     const d = new Date(dateStr);
@@ -1191,7 +1202,7 @@
     const items = state.items.filter(i => !i.done && i.date === state.calDay);
     const todos = state.todos.filter(t => t.date === state.calDay)
       .sort((a, b) => (a.priority || 4) - (b.priority || 4));
-    const header = `<div class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">📅 ${formatDate(state.calDay)}</div>`;
+    const header = `<div class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1.5">📅 ${thaiDayChip(state.calDay)}<span>ที่ ${formatDate(state.calDay)}</span></div>`;
 
     let html = header;
     if (items.length) html += `<div class="space-y-3">${items.map(renderCard).join('')}</div>`;
@@ -1238,17 +1249,17 @@
     showToast(isRecurring(item.repeat) ? 'ทำเสร็จ + สร้างรอบถัดไปแล้ว' : 'ทำเสร็จแล้ว', 'success');
   };
 
-  // หัวข้อกลุ่มวันสำหรับ To-Do: { text, cls }
-  function todoDayHeader(dateStr) {
-    if (!dateStr) return { text: '📌 ไม่มีกำหนด', cls: 'text-gray-400 dark:text-gray-500' };
+  // หัวข้อกลุ่มวันสำหรับ To-Do — คืน HTML (ชื่อวัน+สีประจำวัน · วันที่ · สถานะ)
+  function todoDayHeaderHtml(dateStr) {
+    if (!dateStr) return '<span class="text-sm font-semibold text-gray-400 dark:text-gray-500">📌 ไม่มีกำหนด</span>';
     const d = daysLeft(dateStr);
-    let label = formatDate(dateStr);
-    if (d === 0) label = `วันนี้ · ${label}`;
-    else if (d === 1) label = `พรุ่งนี้ · ${label}`;
-    if (d < 0)  return { text: `${label} · เลยกำหนด ${Math.abs(d)} วัน`, cls: 'text-red-500 dark:text-red-400' };
-    if (d === 0) return { text: label, cls: 'text-red-500 dark:text-red-400' };
-    if (d <= 3) return { text: label, cls: 'text-amber-500 dark:text-amber-400' };
-    return { text: label, cls: 'text-gray-600 dark:text-gray-300' };
+    const dateLabel = formatDate(dateStr);
+    let rel = '', relCls = 'text-gray-600 dark:text-gray-300';
+    if (d < 0)        { rel = ` · ⚠️ เลยกำหนด ${Math.abs(d)} วัน`; relCls = 'text-red-500 dark:text-red-400'; }
+    else if (d === 0) { rel = ' · วันนี้';   relCls = 'text-red-500 dark:text-red-400'; }
+    else if (d === 1) { rel = ' · พรุ่งนี้'; relCls = 'text-amber-500 dark:text-amber-400'; }
+    else if (d <= 3)  { relCls = 'text-amber-500 dark:text-amber-400'; }
+    return `<span class="text-sm">${thaiDayChip(dateStr)}</span><span class="text-sm font-semibold ${relCls}">ที่ ${dateLabel}${rel}</span>`;
   }
 
   function renderTodoRow(t, hideDate) {
@@ -1330,21 +1341,20 @@
       return pa - pb;
     });
 
-    // กล่องครอบแถวในวันเดียวกัน (มีเส้นคั่นระหว่างแถว)
-    const dayBox = rowsHtml => `
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden divide-y divide-gray-100 dark:divide-gray-700">${rowsHtml}</div>`;
-
     let html = keys.map(k => {
-      const h = todoDayHeader(k);
       const list = sortInGroup(groups[k]);
+      // กล่องวันเลยกำหนด (มีงานยังไม่เสร็จ) ขึ้นกรอบแดงให้เด่น
+      const overdue = k && daysLeft(k) < 0 && list.some(it => !it.done);
+      const boxBorder = overdue ? 'border-red-200 dark:border-red-800/60 ring-1 ring-red-100 dark:ring-red-900/40' : 'border-gray-100 dark:border-gray-700';
+      const box = `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border ${boxBorder} overflow-hidden divide-y divide-gray-100 dark:divide-gray-700">${list.map(renderItem).join('')}</div>`;
       return `
         <div>
           <div class="flex items-center gap-2 mb-2 px-0.5">
-            <span class="text-sm font-semibold ${h.cls}">${h.text}</span>
+            ${todoDayHeaderHtml(k)}
             <span class="text-xs text-gray-400">(${list.length})</span>
             <span class="flex-1 border-t border-gray-200 dark:border-gray-700"></span>
           </div>
-          ${dayBox(list.map(renderItem).join(''))}
+          ${box}
         </div>`;
     }).join('');
 
