@@ -1192,25 +1192,15 @@
   /* =========================================================
      To-Do List
      ========================================================= */
-  // การ์ด reminder ที่ใกล้/เลยกำหนด (รวมใน todo list เรียงตามวัน)
+  // การ์ด reminder ที่ใกล้/เลยกำหนด (รวมใน todo list ใต้หัววันที่)
   function renderAutoReminderCard(item) {
-    const d = daysLeft(item.date);
     const cat = CATEGORIES[item.category] || { icon: '📌', label: item.category || '' };
-    let daysLabel = formatDate(item.date), dayCls = 'text-gray-500 dark:text-gray-400';
-    if (d < 0)       { daysLabel = `เลยกำหนดมา ${Math.abs(d)} วัน`; dayCls = 'text-red-500 dark:text-red-400 font-semibold'; }
-    else if (d === 0){ daysLabel = 'ครบกำหนดวันนี้!';              dayCls = 'text-red-500 dark:text-red-400 font-semibold'; }
-    else if (d === 1){ daysLabel = 'พรุ่งนี้';                     dayCls = 'text-amber-500 dark:text-amber-400 font-medium'; }
-    else if (d <= 3) { daysLabel = `อีก ${d} วัน`;                dayCls = 'text-amber-500 dark:text-amber-400'; }
-    else             { daysLabel = `อีก ${d} วัน`; }
     return `
       <button onclick="goToReminder()" class="w-full text-left flex items-center gap-3 bg-violet-50 dark:bg-violet-900/30 border border-violet-100 dark:border-violet-800/50 rounded-xl pl-0 pr-3 py-3 border-l-4 border-l-violet-500 hover:bg-violet-100 dark:hover:bg-violet-900/50 transition active:scale-[.99]">
         <span class="text-xl shrink-0 ml-3">${cat.icon}</span>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">${escapeHtml(item.name)}</p>
-          <div class="flex items-center gap-2 mt-0.5">
-            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-800 text-violet-600 dark:text-violet-300 font-medium">🔔 แจ้งเตือน</span>
-            <span class="text-[11px] ${dayCls} flex items-center gap-0.5"><svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>${daysLabel}</span>
-          </div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-800 text-violet-600 dark:text-violet-300 font-medium inline-block mt-0.5">🔔 แจ้งเตือน</span>
         </div>
         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-violet-400 dark:text-violet-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
       </button>`;
@@ -1221,9 +1211,22 @@
     render();
   };
 
-  function renderTodoCard(t) {
+  // หัวข้อกลุ่มวันสำหรับ To-Do: { text, cls }
+  function todoDayHeader(dateStr) {
+    if (!dateStr) return { text: '📌 ไม่มีกำหนด', cls: 'text-gray-400 dark:text-gray-500' };
+    const d = daysLeft(dateStr);
+    let label = formatDate(dateStr);
+    if (d === 0) label = `วันนี้ · ${label}`;
+    else if (d === 1) label = `พรุ่งนี้ · ${label}`;
+    if (d < 0)  return { text: `${label} · เลยกำหนด ${Math.abs(d)} วัน`, cls: 'text-red-500 dark:text-red-400' };
+    if (d === 0) return { text: label, cls: 'text-red-500 dark:text-red-400' };
+    if (d <= 3) return { text: label, cls: 'text-amber-500 dark:text-amber-400' };
+    return { text: label, cls: 'text-gray-600 dark:text-gray-300' };
+  }
+
+  function renderTodoCard(t, hideDate) {
     const p = TODO_PRIORITY[t.priority] || TODO_PRIORITY[4];
-    const deadlineHtml = t.date ? (() => {
+    const deadlineHtml = (t.date && !hideDate) ? (() => {
       const d = daysLeft(t.date);
       let cls = 'text-gray-400', label = formatDate(t.date);
       if (d < 0)       { cls = 'text-red-500 font-medium'; label = `เลยมาแล้ว ${Math.abs(d)} วัน`; }
@@ -1233,12 +1236,12 @@
       return `<span class="text-[11px] ${cls} flex items-center gap-0.5"><svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>${label}</span>`;
     })() : '';
     return `
-      <div class="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 pl-0 pr-3 py-3 border-l-4 ${p.borderCls} ${t.done ? 'opacity-50' : ''}">
-        <button onclick="toggleTodo('${t.id}')" class="shrink-0 ml-3 w-6 h-6 rounded-full border-2 ${t.done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 hover:border-blue-400'} flex items-center justify-center text-white transition" aria-label="ติ๊กเสร็จ">
+      <div class="flex items-center gap-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 pl-0 pr-3 py-3 border-l-4 ${p.borderCls} ${t.done ? 'opacity-50' : ''}">
+        <button onclick="toggleTodo('${t.id}')" class="shrink-0 ml-3 w-6 h-6 rounded-full border-2 ${t.done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 dark:border-gray-500 hover:border-blue-400'} flex items-center justify-center text-white transition" aria-label="ติ๊กเสร็จ">
           ${t.done ? '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
         </button>
         <div class="flex-1 min-w-0">
-          <p class="text-sm break-words leading-snug ${t.done ? 'line-through text-gray-400' : 'text-gray-800'}">${escapeHtml(t.text)}</p>
+          <p class="text-sm break-words leading-snug ${t.done ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-100'}">${escapeHtml(t.text)}</p>
           <div class="flex items-center gap-2 mt-0.5">
             <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium ${p.badgeCls}">${p.emoji} ${p.label}</span>
             ${deadlineHtml}
@@ -1271,19 +1274,8 @@
           .map(i => ({ ...i, _isReminder: true }))
       : [];
 
-    // รวม incomplete items ทั้งหมด เรียงตามวัน (เร็วสุดก่อน) แล้ว priority
-    const incomplete = [
-      ...autoItems,
-      ...filtered.filter(t => !t.done),
-    ].sort((a, b) => {
-      const da = a.date || '9999-99-99', db = b.date || '9999-99-99';
-      if (da !== db) return da.localeCompare(db);
-      // วันเดียวกัน: reminder ก่อน (treated as priority 0) แล้วตาม priority
-      const pa = a._isReminder ? 0 : (a.priority || 4);
-      const pb = b._isReminder ? 0 : (b.priority || 4);
-      return pa - pb;
-    });
-
+    // รวมงานที่ยังไม่เสร็จ (reminder + todo)
+    const incomplete = [...autoItems, ...filtered.filter(t => !t.done)];
     const complete = filtered.filter(t => t.done).sort((a, b) =>
       (b.createdAt || '').localeCompare(a.createdAt || ''));
 
@@ -1291,11 +1283,56 @@
     empty.classList.toggle('hidden', hasContent);
     clearBtn.classList.toggle('hidden', !state.todos.some(t => t.done));
 
-    box.innerHTML = `<div class="space-y-2.5">${
-      [...incomplete, ...complete].map(item =>
-        item._isReminder ? renderAutoReminderCard(item) : renderTodoCard(item)
-      ).join('')
-    }</div>`;
+    // จัดกลุ่มตามวัน ('' = ไม่มีกำหนด)
+    const groups = {};
+    incomplete.forEach(item => {
+      const k = item.date || '';
+      (groups[k] = groups[k] || []).push(item);
+    });
+    // เรียงคีย์วัน: วันใกล้สุดก่อน, ไม่มีกำหนดท้ายสุด
+    const keys = Object.keys(groups).sort((a, b) => {
+      if (a === '') return 1; if (b === '') return -1; return a.localeCompare(b);
+    });
+
+    const renderItem = item => item._isReminder
+      ? renderAutoReminderCard(item)
+      : renderTodoCard(item, true); // hideDate: หัววันแสดงแล้ว
+
+    // ในกลุ่มเดียวกัน: reminder ก่อน แล้วตาม priority
+    const sortInGroup = list => list.sort((a, b) => {
+      const pa = a._isReminder ? 0 : (a.priority || 4);
+      const pb = b._isReminder ? 0 : (b.priority || 4);
+      return pa - pb;
+    });
+
+    let html = keys.map(k => {
+      const h = todoDayHeader(k);
+      const list = sortInGroup(groups[k]);
+      return `
+        <div>
+          <div class="flex items-center gap-2 mb-2 px-0.5">
+            <span class="text-sm font-semibold ${h.cls}">${h.text}</span>
+            <span class="text-xs text-gray-400">(${list.length})</span>
+            <span class="flex-1 border-t border-gray-200 dark:border-gray-700"></span>
+          </div>
+          <div class="space-y-2.5">${list.map(renderItem).join('')}</div>
+        </div>`;
+    }).join('');
+
+    // งานที่เสร็จแล้ว -> ล่างสุดเสมอ
+    if (complete.length > 0) {
+      html += `
+        <div>
+          <div class="flex items-center gap-2 mb-2 px-0.5 mt-2">
+            <span class="text-sm font-semibold text-gray-400 dark:text-gray-500">✅ เสร็จแล้ว</span>
+            <span class="text-xs text-gray-400">(${complete.length})</span>
+            <span class="flex-1 border-t border-gray-200 dark:border-gray-700"></span>
+          </div>
+          <div class="space-y-2.5">${complete.map(t => renderTodoCard(t, true)).join('')}</div>
+        </div>`;
+    }
+
+    box.innerHTML = `<div class="space-y-4">${html}</div>`;
   }
 
   window.toggleTodo = async function (id) {
