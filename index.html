@@ -193,11 +193,11 @@
 
       <!-- แถบเลือกส่วนหลัก: แจ้งเตือน | ทูดู -->
       <div class="mt-3 flex gap-1.5">
-        <button data-section="reminder" class="section-tab flex-1 py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-1">
-          <span>⏰</span> แจ้งเตือนหมดอายุ
-        </button>
         <button data-section="todo" class="section-tab flex-1 py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-1">
           <span>📝</span> งานที่ต้องทำ
+        </button>
+        <button data-section="reminder" class="section-tab flex-1 py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-1">
+          <span>⏰</span> แจ้งเตือนหมดอายุ
         </button>
       </div>
 
@@ -1007,7 +1007,7 @@
     search: '',             // คำค้นหา
     filter: 'all',          // หมวดหมู่ที่เลือก: all | vehicle | ...
     group: 'none',          // การจัดกลุ่ม: none | status | category
-    section: 'reminder',   // ส่วนหลัก: reminder | todo
+    section: 'todo',       // ส่วนหลัก: reminder | todo (เปิดมาที่งานที่ต้องทำก่อน)
     view: 'active',         // มุมมองใน reminder: active | calendar | history
     todos: [],              // รายการ To-Do (cache)
     todoFilter: 'all',      // กรอง todo ตาม priority: all | 1 | 2 | 3 | 4
