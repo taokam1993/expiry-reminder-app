@@ -175,6 +175,7 @@ async function addTodo(env, { text, date, priority }) {
     date:      { stringValue: date || '' },
     priority:  { integerValue: String(priority || 4) },
     done:      { booleanValue: false },
+    archived:  { booleanValue: false },
     createdAt: { stringValue: new Date().toISOString() },
   };
   const res = await fetch(url, {
@@ -200,11 +201,12 @@ async function listTodos(env) {
       date: f.date?.stringValue || '',
       priority: f.priority?.integerValue ? +f.priority.integerValue : 4,
       done: f.done?.booleanValue === true,
+      archived: f.archived?.booleanValue === true,
     };
   });
-  // ครบกำหนดวันนี้/พรุ่งนี้/เลยกำหนด ที่ยังไม่เสร็จ
+  // ครบกำหนดวันนี้/พรุ่งนี้/เลยกำหนด ที่ยังไม่เสร็จ (ไม่รวมที่เก็บเข้าประวัติ)
   const due = todos
-    .filter(t => !t.done && t.date && t.date <= addDays(today, 1))
+    .filter(t => !t.done && !t.archived && t.date && t.date <= addDays(today, 1))
     .sort((a, b) => a.date.localeCompare(b.date) || a.priority - b.priority);
   if (!due.length) return '🎉 วันนี้ไม่มีงานค้าง';
   const lines = ['📝 งานวันนี้ + พรุ่งนี้'];

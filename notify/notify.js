@@ -80,6 +80,7 @@ async function fetchTodos(db) {
       date: d.date || '',
       priority: typeof d.priority === 'number' ? d.priority : 4,
       done: d.done === true,
+      archived: d.archived === true,
     };
   });
 }
@@ -227,7 +228,7 @@ function buildFlex(due, todos, today) {
   // งานที่ต้องทำวันนี้+พรุ่งนี้: ยังไม่เสร็จ + มีกำหนด + ครบกำหนดภายในพรุ่งนี้ (รวมเลยกำหนด)
   // เรียง: เลยกำหนด/ใกล้สุดก่อน แล้วตามลำดับความสำคัญ
   const todos = todosRaw
-    .filter(t => t.date && !t.done)
+    .filter(t => t.date && !t.done && !t.archived)
     .map(t => ({ ...t, d: daysLeft(t.date, today) }))
     .filter(t => t.d <= 1)
     .sort((a, b) => a.d - b.d || a.priority - b.priority);
