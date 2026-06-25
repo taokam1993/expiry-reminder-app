@@ -582,17 +582,20 @@
           </div>
           <!-- โค้ดที่สร้าง -->
           <div id="line-link-code-box" class="hidden mt-2">
-            <p class="text-sm text-gray-600 mb-2">ทำตามนี้ในแอป LINE:</p>
-            <ol class="text-sm text-gray-600 space-y-1 mb-3 list-decimal pl-5">
-              <li>เพิ่มเพื่อน OA <b id="line-oa-name">เตือนหมดอายุ</b></li>
-              <li>พิมพ์ข้อความนี้ในแชต:</li>
-            </ol>
             <div class="bg-gray-100 rounded-xl p-3 text-center">
-              <div class="text-xs text-gray-400">พิมพ์ในแชต OA</div>
+              <div class="text-xs text-gray-400">โค้ดเชื่อมของคุณ</div>
               <div class="text-2xl font-bold tracking-wider text-gray-800 mt-1">เชื่อม <span id="line-link-code">----</span></div>
             </div>
             <p id="line-link-exp" class="text-xs text-amber-500 text-center mt-2">โค้ดหมดอายุใน 10 นาที</p>
-            <button id="line-link-regen" class="w-full mt-3 py-2 rounded-xl border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">สร้างโค้ดใหม่</button>
+
+            <!-- ปุ่มเด้งเข้า LINE พร้อมพิมพ์โค้ดให้ -->
+            <a id="line-link-open" href="#" target="_blank" rel="noopener"
+              class="w-full mt-3 py-3 rounded-xl bg-[#06C755] text-white font-medium hover:brightness-95 flex items-center justify-center gap-2">
+              <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 2C6.48 2 2 5.69 2 10.23c0 4.07 3.55 7.48 8.35 8.13.32.07.77.21.88.49.1.25.07.64.03.89l-.14.86c-.04.25-.2 1 .88.54 1.08-.45 5.8-3.42 7.91-5.85C21.32 14.13 22 12.27 22 10.23 22 5.69 17.52 2 12 2z"/></svg>
+              เปิด LINE แล้วส่งโค้ดเลย
+            </a>
+            <p class="text-[11px] text-gray-400 text-center mt-2">ยังไม่ได้เพิ่มเพื่อน? กดปุ่มนี้จะพาเพิ่ม OA <b>จดจ่อ (ผู้ช่วย)</b> ให้ แล้วพิมพ์โค้ดให้อัตโนมัติ — แค่กดส่ง</p>
+            <button id="line-link-regen" class="w-full mt-2 py-2 rounded-xl border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">สร้างโค้ดใหม่</button>
           </div>
         </div>
       </div>
@@ -2551,6 +2554,10 @@
       const res = await Store.createLinkCode();
       if (!res) { showToast('ใช้ได้เฉพาะตอนล็อกอินด้วย Google', 'error'); return; }
       document.getElementById('line-link-code').textContent = res.code;
+      // ลิงก์เปิดแชต OA พร้อมพิมพ์ "เชื่อม <โค้ด>" ให้อัตโนมัติ
+      const LINE_OA_ID = '@083rqzgs';
+      document.getElementById('line-link-open').href =
+        `https://line.me/R/oaMessage/${encodeURIComponent(LINE_OA_ID)}/?${encodeURIComponent('เชื่อม ' + res.code)}`;
       document.getElementById('line-link-start').classList.add('hidden');
       document.getElementById('line-link-code-box').classList.remove('hidden');
     } catch (err) {
