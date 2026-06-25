@@ -19,6 +19,12 @@
   <script>
     if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
   </script>
+  <!-- เร่งการเชื่อมต่อ Firebase/CDN ล่วงหน้า (ลดเวลาโหลด) -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin />
+  <link rel="dns-prefetch" href="https://reminder-app-5e30a.firebaseapp.com" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1019,16 +1025,35 @@
   };
 
   // โหลดข้อมูลจาก backend (ยิง fetch จริงเฉพาะตอนนี้)
-  async function loadData() {
-    showState('loading');
+  // ----- Cache ข้อมูลล่าสุดไว้ใน localStorage เพื่อแสดงทันทีตอนเปิดแอป -----
+  let _currentUid = null;
+  function cacheKey(uid) { return 'reminder_cache_' + uid; }
+  function saveCache(uid) {
+    if (!uid) return;
     try {
-      state.items = await Store.getAll();
-      state.todos = await Store.getTodos();
+      // ตัดรูป (image) ออกกันเกินโควต้า localStorage — รูปจริงจะโหลดตอนซิงค์
+      const items = state.items.map(i => ({ ...i, image: '' }));
+      localStorage.setItem(cacheKey(uid), JSON.stringify({ items, todos: state.todos }));
+    } catch (e) { /* เกินโควต้า/ปิดกั้น — ข้ามได้ */ }
+  }
+  function loadCache(uid) {
+    try { const r = localStorage.getItem(cacheKey(uid)); return r ? JSON.parse(r) : null; }
+    catch (e) { return null; }
+  }
+
+  // silent = true -> ซิงค์เบื้องหลัง ไม่ขึ้นสปินเนอร์ (เพราะมี cache แสดงอยู่แล้ว)
+  async function loadData(silent) {
+    if (!silent) showState('loading');
+    try {
+      const [items, todos] = await Promise.all([Store.getAll(), Store.getTodos()]);
+      state.items = items;
+      state.todos = todos;
       await rolloverRecurring(); // เลื่อนวันรายการที่ทำซ้ำทุกปีให้เป็นปัจจุบัน
       render();
+      saveCache(_currentUid);
     } catch (err) {
-      els.errorDetail.textContent = err.message || String(err);
-      showState('error');
+      if (!silent) { els.errorDetail.textContent = err.message || String(err); showState('error'); }
+      // ถ้า silent (มี cache อยู่แล้ว) ไม่ต้องเด้ง error ทับของเดิม
     }
   }
 
@@ -2280,11 +2305,11 @@
      INIT
      ========================================================= */
   // โหลด UI หลังจากรู้ store แล้ว (ใช้ทั้งหลังล็อกอิน Firebase และโหมด local)
-  async function bootData() {
+  async function bootData(silent) {
     await loadCustomCategories();
     renderCategoryOptions();
     renderFilterBar();
-    await loadData();
+    await loadData(silent);
   }
 
   (async function init() {
@@ -2311,13 +2336,21 @@
           profileWrap.classList.remove('hidden');
           setProfile(user);
           Store = makeUserStore(user.uid);
+          _currentUid = user.uid;
+          // แสดงข้อมูลจาก cache ทันที (ถ้ามี) แล้วค่อยซิงค์เบื้องหลัง
+          const cached = loadCache(user.uid);
+          if (cached) {
+            state.items = cached.items || [];
+            state.todos = cached.todos || [];
+            renderFilterBar();
+            render();
+          }
           try {
-            showState('loading');
+            if (!cached) showState('loading');
             await migrateLegacyData();
-            await bootData();
+            await bootData(!!cached);   // มี cache -> ซิงค์เงียบๆ ไม่ขึ้นสปินเนอร์
           } catch (err) {
-            els.errorDetail.textContent = err.message || String(err);
-            showState('error');
+            if (!cached) { els.errorDetail.textContent = err.message || String(err); showState('error'); }
           }
         } else {
           loginScreen.classList.remove('hidden');
