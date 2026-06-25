@@ -128,7 +128,8 @@ function reminderRow(i, idx) {
 // แถวงานที่ต้องทำ (todo)
 function todoRow(t, idx) {
   const color = PRI_COLOR[t.priority] || PRI_COLOR[4];
-  const status = t.d < 0 ? `เลยกำหนด ${Math.abs(t.d)} วัน` : (t.d === 0 ? 'วันนี้' : '');
+  const status = t.d < 0 ? `เลยกำหนด ${Math.abs(t.d)} วัน`
+    : (t.d === 0 ? 'วันนี้' : (t.d === 1 ? 'พรุ่งนี้' : ''));
   const sub = [];
   if (t.date) sub.push({ type: 'text', text: `📅 ${formatThai(t.date)}`, size: 'xs', color: '#9CA3AF', flex: 1, gravity: 'center' });
   if (status) sub.push({ type: 'text', text: status, size: 'xs', weight: 'bold', color: color, align: 'end', gravity: 'center', flex: 0 });
@@ -160,7 +161,7 @@ function buildFlex(due, todos, today) {
   const body = [];
 
   if (todos.length) {
-    body.push(sectionTitle(`📝 งานวันนี้ (${todos.length})`));
+    body.push(sectionTitle(`📝 งานวันนี้ + พรุ่งนี้ (${todos.length})`));
     todos.forEach((t, idx) => {
       if (idx > 0) body.push({ type: 'separator', margin: 'md', color: '#F3F4F6' });
       body.push(todoRow(t, idx));
@@ -223,12 +224,12 @@ function buildFlex(due, todos, today) {
     .filter(i => i.d <= i.lead)
     .sort((a, b) => a.d - b.d);
 
-  // งานที่ต้องทำวันนี้: ยังไม่เสร็จ + มีกำหนด + ครบกำหนดวันนี้หรือเลยกำหนด
+  // งานที่ต้องทำวันนี้+พรุ่งนี้: ยังไม่เสร็จ + มีกำหนด + ครบกำหนดภายในพรุ่งนี้ (รวมเลยกำหนด)
   // เรียง: เลยกำหนด/ใกล้สุดก่อน แล้วตามลำดับความสำคัญ
   const todos = todosRaw
     .filter(t => t.date && !t.done)
     .map(t => ({ ...t, d: daysLeft(t.date, today) }))
-    .filter(t => t.d <= 0)
+    .filter(t => t.d <= 1)
     .sort((a, b) => a.d - b.d || a.priority - b.priority);
 
   if (due.length === 0 && todos.length === 0) {
