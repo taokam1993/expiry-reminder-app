@@ -1152,39 +1152,55 @@
     const todayStr = new Date().toLocaleDateString('en-CA');
     if (!state.calDay) state.calDay = todayStr;
 
-    // จับคู่วันที่ -> รายการที่ยัง active
+    // จับคู่วันที่ -> รายการแจ้งเตือนที่ยัง active
     const byDate = {};
     state.items.filter(i => !i.done && i.date).forEach(i => { (byDate[i.date] = byDate[i.date] || []).push(i); });
+    // จับคู่วันที่ -> งานที่ต้องทำที่ยังไม่เสร็จ
+    const todoByDate = {};
+    state.todos.filter(t => !t.done && t.date).forEach(t => { (todoByDate[t.date] = todoByDate[t.date] || []).push(t); });
 
     const cells = [];
     for (let i = 0; i < firstDay; i++) cells.push('<div></div>');
     for (let d = 1; d <= daysInMonth; d++) {
       const ds = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const items = byDate[ds] || [];
+      const todos = todoByDate[ds] || [];
       const isToday = ds === todayStr;
       const isSel = ds === state.calDay;
-      let dot = '';
+      // จุดบอกวัน: สีตามสถานะแจ้งเตือน + จุดม่วงถ้ามีงานที่ต้องทำ
+      const dots = [];
       if (items.length) {
         const st = items.map(it => getStatus(it.date));
         const color = st.includes('critical') ? 'bg-red-500' : st.includes('warning') ? 'bg-amber-400' : 'bg-emerald-400';
-        dot = `<span class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${color}"></span>`;
+        dots.push(`<span class="w-1.5 h-1.5 rounded-full ${color}"></span>`);
       }
-      const cls = isSel ? 'bg-blue-600 text-white' : isToday ? 'bg-blue-50 text-blue-600 font-semibold' : 'hover:bg-gray-100 text-gray-700';
-      cells.push(`<button onclick="selectCalDay('${ds}')" class="relative aspect-square rounded-lg text-sm flex items-center justify-center ${cls}">${d}${dot}</button>`);
+      if (todos.length) dots.push('<span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>');
+      const dotRow = dots.length
+        ? `<span class="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">${dots.join('')}</span>` : '';
+      const cls = isSel ? 'bg-blue-600 text-white' : isToday ? 'bg-blue-50 text-blue-600 font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300';
+      cells.push(`<button onclick="selectCalDay('${ds}')" class="relative aspect-square rounded-lg text-sm flex items-center justify-center ${cls}">${d}${dotRow}</button>`);
     }
     document.getElementById('cal-grid').innerHTML = cells.join('');
     renderCalDayItems();
   }
 
-  // รายการของวันที่เลือกในปฏิทิน
+  // รายการของวันที่เลือกในปฏิทิน (แจ้งเตือน + งานที่ต้องทำ)
   function renderCalDayItems() {
     const box = document.getElementById('cal-day-items');
     if (!state.calDay) { box.innerHTML = '<p class="text-center text-xs text-gray-400 mt-2">แตะวันที่เพื่อดูรายการ</p>'; return; }
     const items = state.items.filter(i => !i.done && i.date === state.calDay);
-    const header = `<div class="text-sm font-medium text-gray-600 mb-1">📅 ${formatDate(state.calDay)}</div>`;
-    box.innerHTML = items.length
-      ? header + items.map(renderCard).join('')
-      : header + '<p class="text-center text-xs text-gray-400 py-3">ไม่มีรายการในวันนี้</p>';
+    const todos = state.todos.filter(t => t.date === state.calDay)
+      .sort((a, b) => (a.priority || 4) - (b.priority || 4));
+    const header = `<div class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">📅 ${formatDate(state.calDay)}</div>`;
+
+    let html = header;
+    if (items.length) html += `<div class="space-y-3">${items.map(renderCard).join('')}</div>`;
+    if (todos.length) {
+      html += `<div class="mt-2"><div class="text-xs font-semibold text-violet-500 mb-1.5 px-0.5">📝 งานที่ต้องทำ</div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden divide-y divide-gray-100 dark:divide-gray-700">${todos.map(t => renderTodoRow(t, true)).join('')}</div></div>`;
+    }
+    if (!items.length && !todos.length) html += '<p class="text-center text-xs text-gray-400 py-3">ไม่มีรายการในวันนี้</p>';
+    box.innerHTML = html;
   }
 
   window.selectCalDay = function (ds) { state.calDay = ds; renderCalendar(); };
@@ -1335,14 +1351,20 @@
     box.innerHTML = `<div class="space-y-4">${html}</div>`;
   }
 
+  // รีเฟรชมุมมองที่กำลังแสดง todo (todo list หรือ ปฏิทิน)
+  function refreshTodoViews() {
+    renderTodos();
+    if (state.section === 'reminder' && state.view === 'calendar') renderCalendar();
+  }
+
   window.toggleTodo = async function (id) {
     const t = state.todos.find(x => x.id === id);
     if (!t) return;
-    t.done = !t.done; renderTodos();          // อัปเดตทันที (optimistic)
+    t.done = !t.done; refreshTodoViews();      // อัปเดตทันที (optimistic)
     await Store.updateTodo(id, { done: t.done });
   };
   window.deleteTodo = async function (id) {
-    state.todos = state.todos.filter(x => x.id !== id); renderTodos();
+    state.todos = state.todos.filter(x => x.id !== id); refreshTodoViews();
     await Store.removeTodo(id);
   };
   const todoModal = {
@@ -1389,7 +1411,7 @@
         if (t) state.todos.push(t); else state.todos = await Store.getTodos();
       }
       closeTodoModal();
-      renderTodos();
+      refreshTodoViews();
       showToast(id ? 'แก้ไขงานแล้ว' : 'เพิ่มงานแล้ว', 'success');
     } catch (err) {
       showToast('บันทึกไม่สำเร็จ: ' + (err.message || err), 'error');
