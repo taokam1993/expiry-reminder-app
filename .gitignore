@@ -1,2 +1,4 @@
 notify/node_modules/
 node_modules/
+line-bot/.wrangler/
+_iconbuild/
