@@ -1285,18 +1285,16 @@
           .map(i => ({ ...i, _isReminder: true }))
       : [];
 
-    // รวมงานที่ยังไม่เสร็จ (reminder + todo)
-    const incomplete = [...autoItems, ...filtered.filter(t => !t.done)];
-    const complete = filtered.filter(t => t.done).sort((a, b) =>
-      (b.createdAt || '').localeCompare(a.createdAt || ''));
+    // รวมทุกงาน (reminder + todo ทั้งที่เสร็จและยังไม่เสร็จ) — ติ๊กเสร็จแล้วอยู่กลุ่มวันเดิม
+    const allItems = [...autoItems, ...filtered];
 
-    const hasContent = incomplete.length > 0 || complete.length > 0;
+    const hasContent = allItems.length > 0;
     empty.classList.toggle('hidden', hasContent);
     clearBtn.classList.toggle('hidden', !state.todos.some(t => t.done));
 
     // จัดกลุ่มตามวัน ('' = ไม่มีกำหนด)
     const groups = {};
-    incomplete.forEach(item => {
+    allItems.forEach(item => {
       const k = item.date || '';
       (groups[k] = groups[k] || []).push(item);
     });
@@ -1309,7 +1307,7 @@
       ? renderAutoReminderRow(item)
       : renderTodoRow(item, true); // hideDate: หัววันแสดงแล้ว
 
-    // ในกลุ่มเดียวกัน: reminder ก่อน แล้วตาม priority
+    // ในกลุ่มเดียวกัน: reminder ก่อน แล้วตาม priority (ไม่แยกงานที่เสร็จออกไป)
     const sortInGroup = list => list.sort((a, b) => {
       const pa = a._isReminder ? 0 : (a.priority || 4);
       const pb = b._isReminder ? 0 : (b.priority || 4);
@@ -1333,19 +1331,6 @@
           ${dayBox(list.map(renderItem).join(''))}
         </div>`;
     }).join('');
-
-    // งานที่เสร็จแล้ว -> ล่างสุดเสมอ
-    if (complete.length > 0) {
-      html += `
-        <div>
-          <div class="flex items-center gap-2 mb-2 px-0.5 mt-2">
-            <span class="text-sm font-semibold text-gray-400 dark:text-gray-500">✅ เสร็จแล้ว</span>
-            <span class="text-xs text-gray-400">(${complete.length})</span>
-            <span class="flex-1 border-t border-gray-200 dark:border-gray-700"></span>
-          </div>
-          ${dayBox(complete.map(t => renderTodoRow(t, true)).join(''))}
-        </div>`;
-    }
 
     box.innerHTML = `<div class="space-y-4">${html}</div>`;
   }
