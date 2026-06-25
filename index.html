@@ -1457,6 +1457,9 @@
     await Store.updateTodo(id, { done: t.done });
   };
   window.deleteTodo = async function (id) {
+    const t = state.todos.find(x => x.id === id);
+    if (!t) return;
+    if (!(await confirmDialog({ title: 'ลบงาน', message: `ลบงาน "${t.text}" ออกถาวร?`, okText: 'ลบ', danger: true, icon: '🗑️' }))) return;
     state.todos = state.todos.filter(x => x.id !== id); refreshTodoViews();
     await Store.removeTodo(id);
   };
