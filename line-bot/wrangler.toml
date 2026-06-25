@@ -1,0 +1,10 @@
+name = "line-todo-bot"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Secrets (ตั้งผ่าน `wrangler secret put ...` หรือใน Dashboard > Settings > Variables):
+#   LINE_CHANNEL_ACCESS_TOKEN
+#   LINE_CHANNEL_SECRET
+#   FIREBASE_SERVICE_ACCOUNT   (วาง JSON ทั้งก้อน)
+#   OWNER_UID
+#   OWNER_LINE_USER_ID         (ไม่บังคับ)
