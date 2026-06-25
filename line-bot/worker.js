@@ -62,24 +62,35 @@ export default {
 // ===========================================================
 async function handleEvent(ev, env) {
   if (ev.type !== 'message' || !ev.message || ev.message.type !== 'text') return;
-
-  // จำกัดให้รับเฉพาะเจ้าของ (ถ้าตั้ง OWNER_LINE_USER_ID ไว้)
-  const fromId = ev.source && ev.source.userId;
-  if (env.OWNER_LINE_USER_ID && fromId !== env.OWNER_LINE_USER_ID) {
-    await reply(ev.replyToken, '⛔ บอทนี้เป็นส่วนตัว ไม่สามารถใช้งานได้', env);
-    return;
-  }
-
+  const lineUserId = ev.source && ev.source.userId;
   const text = (ev.message.text || '').trim();
   if (!text) return;
 
-  // ---- คำสั่งพิเศษ ----
+  const token = await getAccessToken(env);
+
+  // ---- คำสั่งเชื่อมบัญชี: "เชื่อม 12345" ----
+  const linkM = text.match(/^เชื่อม\s*(\d{4,8})$/);
+  if (linkM) {
+    await reply(ev.replyToken, await handleLink(env, token, lineUserId, linkM[1]), env);
+    return;
+  }
+
+  // ---- ช่วยเหลือ (ใช้ได้แม้ยังไม่เชื่อม) ----
   if (/^(ช่วย|help|วิธีใช้|\?)$/i.test(text)) {
     await reply(ev.replyToken, helpText(), env);
     return;
   }
+
+  // ---- ต้องเชื่อมบัญชีก่อนถึงจะใช้ได้ ----
+  const uid = await resolveUid(env, token, lineUserId);
+  if (!uid) {
+    await reply(ev.replyToken, linkPrompt(), env);
+    return;
+  }
+
+  // ---- ดูงานวันนี้ ----
   if (/^(งาน|รายการ|วันนี้|งานวันนี้|todo)$/i.test(text)) {
-    await reply(ev.replyToken, await listTodos(env), env);
+    await reply(ev.replyToken, await listTodos(env, token, uid), env);
     return;
   }
 
@@ -91,7 +102,7 @@ async function handleEvent(ev, env) {
     return;
   }
 
-  await addTodo(env, { text: name, date, priority });
+  await addTodo(env, token, uid, { text: name, date, priority });
 
   const lines = [
     '✅ เพิ่มงานแล้ว',
@@ -100,6 +111,71 @@ async function handleEvent(ev, env) {
   if (date) lines.push(`📅 ${formatThai(date)} (${dayPhrase(date, today)})`);
   else lines.push('📌 ไม่มีกำหนด');
   await reply(ev.replyToken, lines.join('\n'), env);
+}
+
+// ===========================================================
+//  เชื่อมบัญชี: resolve uid จาก lineUserId / ผูกด้วยโค้ด
+// ===========================================================
+function fsBase(env) {
+  const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
+  return `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents`;
+}
+async function fsGet(env, token, path) {
+  const res = await fetch(`${fsBase(env)}/${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`fsGet ${path} (${res.status})`);
+  return (await res.json()).fields || {};
+}
+async function fsPatch(env, token, path, fields, maskFields) {
+  let url = `${fsBase(env)}/${path}`;
+  if (maskFields) url += '?' + maskFields.map(f => `updateMask.fieldPaths=${f}`).join('&');
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) throw new Error(`fsPatch ${path} (${res.status}): ${await res.text()}`);
+}
+async function fsDelete(env, token, path) {
+  await fetch(`${fsBase(env)}/${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+}
+
+async function resolveUid(env, token, lineUserId) {
+  if (!lineUserId) return null;
+  const f = await fsGet(env, token, `lineLinks/${lineUserId}`);
+  return f && f.uid ? f.uid.stringValue : null;
+}
+
+async function handleLink(env, token, lineUserId, code) {
+  if (!lineUserId) return '⛔ อ่านบัญชี LINE ของคุณไม่ได้';
+  const f = await fsGet(env, token, `linkCodes/${code}`);
+  if (!f || !f.uid) return '❌ โค้ดไม่ถูกต้อง\nเปิดแอป > รูปโปรไฟล์ > เชื่อม LINE เพื่อรับโค้ดใหม่';
+  const exp = f.exp ? Number(f.exp.integerValue || f.exp.doubleValue || 0) : 0;
+  if (exp && Date.now() > exp) {
+    await fsDelete(env, token, `linkCodes/${code}`);
+    return '⌛ โค้ดหมดอายุแล้ว\nสร้างโค้ดใหม่ในแอปแล้วลองอีกครั้ง';
+  }
+  const uid = f.uid.stringValue;
+  await fsPatch(env, token, `lineLinks/${lineUserId}`, {
+    uid: { stringValue: uid }, linkedAt: { stringValue: new Date().toISOString() },
+  });
+  await fsPatch(env, token, `users/${uid}/meta/app`,
+    { lineLinked: { booleanValue: true }, lineUserId: { stringValue: lineUserId } },
+    ['lineLinked', 'lineUserId']);
+  await fsDelete(env, token, `linkCodes/${code}`);
+  return '✅ เชื่อมบัญชีสำเร็จ!\nพิมพ์งานได้เลย เช่น "ซื้อนม พรุ่งนี้"\nหรือพิมพ์ "ช่วย" ดูวิธีใช้';
+}
+
+function linkPrompt() {
+  return [
+    '🔗 ยังไม่ได้เชื่อมบัญชี',
+    '',
+    'วิธีเชื่อม:',
+    '1. เปิดแอป "จดจ่อ"',
+    '2. แตะรูปโปรไฟล์ (มุมขวาบน) → เชื่อม LINE',
+    '3. กดสร้างโค้ด แล้วพิมพ์ในแชตนี้',
+    '   เช่น  เชื่อม 12345',
+  ].join('\n');
 }
 
 // ===========================================================
@@ -166,10 +242,8 @@ function parseTask(raw, today) {
 // ===========================================================
 //  Firestore: เพิ่ม todo / อ่าน todo
 // ===========================================================
-async function addTodo(env, { text, date, priority }) {
-  const token = await getAccessToken(env);
-  const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
-  const url = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents/users/${env.OWNER_UID}/todos`;
+async function addTodo(env, token, uid, { text, date, priority }) {
+  const url = `${fsBase(env)}/users/${uid}/todos`;
   const fields = {
     text:      { stringValue: text },
     date:      { stringValue: date || '' },
@@ -186,10 +260,8 @@ async function addTodo(env, { text, date, priority }) {
   if (!res.ok) throw new Error(`Firestore add failed (${res.status}): ${await res.text()}`);
 }
 
-async function listTodos(env) {
-  const token = await getAccessToken(env);
-  const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
-  const url = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents/users/${env.OWNER_UID}/todos?pageSize=300`;
+async function listTodos(env, token, uid) {
+  const url = `${fsBase(env)}/users/${uid}/todos?pageSize=300`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`Firestore list failed (${res.status})`);
   const data = await res.json();
@@ -340,5 +412,7 @@ function helpText() {
     'ความสำคัญ: ใส่ "ด่วน" = 🔴 , "สำคัญ" = 🟡',
     '',
     'พิมพ์ "งาน" = ดูงานวันนี้+พรุ่งนี้',
+    '',
+    '🔗 ยังไม่ได้เชื่อมบัญชี? เปิดแอป > รูปโปรไฟล์ > เชื่อม LINE แล้วพิมพ์ "เชื่อม " ตามด้วยโค้ด',
   ].join('\n');
 }

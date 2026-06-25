@@ -54,9 +54,9 @@ function initAdmin() {
   return admin.firestore();
 }
 
-// ---------- อ่านรายการส่วนตัวของเจ้าของ users/{OWNER_UID}/items ----------
-async function fetchItems(db) {
-  const snap = await db.collection('users').doc(OWNER_UID).collection('items').get();
+// ---------- อ่านรายการแจ้งเตือนของผู้ใช้ users/{uid}/items ----------
+async function fetchItems(db, uid) {
+  const snap = await db.collection('users').doc(uid).collection('items').get();
   return snap.docs.map(doc => {
     const d = doc.data() || {};
     return {
@@ -70,9 +70,9 @@ async function fetchItems(db) {
   });
 }
 
-// ---------- อ่านงานที่ต้องทำ users/{OWNER_UID}/todos ----------
-async function fetchTodos(db) {
-  const snap = await db.collection('users').doc(OWNER_UID).collection('todos').get();
+// ---------- อ่านงานที่ต้องทำ users/{uid}/todos ----------
+async function fetchTodos(db, uid) {
+  const snap = await db.collection('users').doc(uid).collection('todos').get();
   return snap.docs.map(doc => {
     const d = doc.data() || {};
     return {
@@ -85,18 +85,19 @@ async function fetchTodos(db) {
   });
 }
 
-// ---------- 3) ส่งข้อความเข้า LINE ----------
-async function sendLine(message) {
-  const endpoint = LINE_USER_ID
-    ? 'https://api.line.me/v2/bot/message/push'
-    : 'https://api.line.me/v2/bot/message/broadcast';
-  const body = LINE_USER_ID
-    ? { to: LINE_USER_ID, messages: [message] }
-    : { messages: [message] };
-  const res = await fetch(endpoint, {
+// ---------- อ่านรายชื่อผู้ใช้ที่เชื่อม LINE ไว้ (collection lineLinks) ----------
+async function fetchLineTargets(db) {
+  const snap = await db.collection('lineLinks').get();
+  return snap.docs.map(doc => ({ lineUserId: doc.id, uid: (doc.data() || {}).uid }))
+    .filter(t => t.uid);
+}
+
+// ---------- 3) ส่งข้อความ push หา userId เจาะจง ----------
+async function pushLine(toUserId, message) {
+  const res = await fetch('https://api.line.me/v2/bot/message/push', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LINE_TOKEN}` },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ to: toUserId, messages: [message] }),
   });
   if (!res.ok) throw new Error(`ส่ง LINE ไม่สำเร็จ (${res.status}): ${await res.text()}`);
 }
@@ -210,36 +211,53 @@ function buildFlex(due, todos, today) {
   };
 }
 
-// ---------- main ----------
-(async function main() {
-  if (!LINE_TOKEN) throw new Error('ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN');
+// สร้าง+ส่งแจ้งเตือนของผู้ใช้ 1 คน — คืน true ถ้าส่งจริง
+async function notifyOne(db, today, uid, lineUserId) {
+  const [items, todosRaw] = await Promise.all([fetchItems(db, uid), fetchTodos(db, uid)]);
 
-  const today = todayBangkok();
-  const db = initAdmin();
-  const [items, todosRaw] = await Promise.all([fetchItems(db), fetchTodos(db)]);
-
-  // แจ้งเตือน: ยังไม่ทำเสร็จ + ถึงช่วงเตือนล่วงหน้า (leadDays รายรายการ) หรือเลยกำหนด
   const due = items
     .filter(i => i.date && !i.done)
     .map(i => ({ ...i, d: daysLeft(i.date, today), lead: i.leadDays || THRESHOLD_DAYS }))
     .filter(i => i.d <= i.lead)
     .sort((a, b) => a.d - b.d);
 
-  // งานที่ต้องทำวันนี้+พรุ่งนี้: ยังไม่เสร็จ + มีกำหนด + ครบกำหนดภายในพรุ่งนี้ (รวมเลยกำหนด)
-  // เรียง: เลยกำหนด/ใกล้สุดก่อน แล้วตามลำดับความสำคัญ
   const todos = todosRaw
     .filter(t => t.date && !t.done && !t.archived)
     .map(t => ({ ...t, d: daysLeft(t.date, today) }))
     .filter(t => t.d <= 1)
     .sort((a, b) => a.d - b.d || a.priority - b.priority);
 
-  if (due.length === 0 && todos.length === 0) {
-    console.log('ไม่มีรายการ/งานที่ต้องแจ้งเตือนวันนี้ (' + today + ')');
+  if (due.length === 0 && todos.length === 0) return false;
+  await pushLine(lineUserId, buildFlex(due, todos, today));
+  console.log(`  → ${lineUserId.slice(0, 8)}… : ${todos.length} งาน, ${due.length} แจ้งเตือน`);
+  return true;
+}
+
+// ---------- main ----------
+(async function main() {
+  if (!LINE_TOKEN) throw new Error('ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN');
+
+  const today = todayBangkok();
+  const db = initAdmin();
+
+  // รวมเป้าหมาย: เจ้าของ (จาก env) + ทุกคนที่เชื่อม LINE ไว้ (lineLinks) — ไม่ส่งซ้ำ
+  const targets = [];
+  if (OWNER_UID && LINE_USER_ID) targets.push({ uid: OWNER_UID, lineUserId: LINE_USER_ID });
+  for (const t of await fetchLineTargets(db)) {
+    if (!targets.some(x => x.lineUserId === t.lineUserId)) targets.push(t);
+  }
+
+  if (targets.length === 0) {
+    console.log('ยังไม่มีผู้ใช้ที่เชื่อม LINE');
     return;
   }
 
-  await sendLine(buildFlex(due, todos, today));
-  console.log(`ส่งแจ้งเตือนเรียบร้อย: ${todos.length} งาน, ${due.length} แจ้งเตือน (${today})`);
+  let sent = 0;
+  for (const t of targets) {
+    try { if (await notifyOne(db, today, t.uid, t.lineUserId)) sent++; }
+    catch (err) { console.error(`  ✗ ${t.lineUserId.slice(0, 8)}… : ${err.message}`); }
+  }
+  console.log(`เสร็จ: ส่ง ${sent}/${targets.length} คน (${today})`);
 })().catch(err => {
   console.error(err);
   process.exit(1);

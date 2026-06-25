@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ข้อมูลส่วนตัวของผู้ใช้ — อ่าน/เขียนได้เฉพาะเจ้าของ
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // โค้ดเชื่อม LINE — ผู้ใช้สร้างได้เฉพาะของตัวเอง
+    // (บอท/ระบบ อ่าน+ลบ ผ่าน service account ซึ่งข้าม rules อยู่แล้ว)
+    match /linkCodes/{code} {
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
+    // คู่เชื่อม LINE ↔ บัญชี — เฉพาะระบบ (service account) เท่านั้น
+    match /lineLinks/{lineUserId} {
+      allow read, write: if false;
+    }
+  }
+}

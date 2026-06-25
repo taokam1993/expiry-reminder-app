@@ -170,6 +170,11 @@
               </div>
             </div>
             <div id="profile-stats" class="px-4 py-2.5 text-xs text-gray-500 border-b border-gray-100"></div>
+            <button id="btn-line-link" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m6.828-2.828l3-3a4 4 0 015.656 5.656l-1.5 1.5" /></svg>
+              <span class="flex-1">เชื่อม LINE</span>
+              <span id="line-link-badge" class="text-[10px]"></span>
+            </button>
             <button id="btn-logout" class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -548,6 +553,52 @@
     </div>
   </div>
 
+  <!-- ===================== LINE LINK MODAL ===================== -->
+  <div id="line-link-modal" class="modal-hidden hidden fixed inset-0 z-40">
+    <div id="line-link-backdrop" class="modal-backdrop absolute inset-0 bg-black/40"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div class="modal-panel bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl">
+        <div class="px-5 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
+          <h2 class="text-lg font-semibold flex items-center gap-2">🔗 เชื่อม LINE</h2>
+          <button id="line-link-close" class="text-gray-400 hover:text-gray-600 p-1" aria-label="ปิด">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="px-5 py-4">
+          <!-- สถานะ: เชื่อมแล้ว -->
+          <div id="line-link-done" class="hidden text-center py-4">
+            <div class="text-5xl mb-2">✅</div>
+            <p class="font-medium text-gray-800">เชื่อม LINE เรียบร้อยแล้ว</p>
+            <p class="text-sm text-gray-500 mt-1">พิมพ์งานในแชต OA ได้เลย และจะได้รับแจ้งเตือนทุกเช้า</p>
+          </div>
+          <!-- สถานะ: ยังไม่เชื่อม -->
+          <div id="line-link-start">
+            <p class="text-sm text-gray-600 mb-3">เชื่อมบัญชีกับ LINE เพื่อ:</p>
+            <ul class="text-sm text-gray-600 space-y-1 mb-4 list-disc pl-5">
+              <li>พิมพ์ใน LINE เพิ่มงานเข้าแอปได้</li>
+              <li>รับแจ้งเตือนงาน/วันหมดอายุทุกเช้า</li>
+            </ul>
+            <button id="line-link-gen" class="w-full py-2.5 rounded-xl bg-green-600 text-white font-medium hover:bg-green-700">สร้างโค้ดเชื่อม</button>
+          </div>
+          <!-- โค้ดที่สร้าง -->
+          <div id="line-link-code-box" class="hidden mt-2">
+            <p class="text-sm text-gray-600 mb-2">ทำตามนี้ในแอป LINE:</p>
+            <ol class="text-sm text-gray-600 space-y-1 mb-3 list-decimal pl-5">
+              <li>เพิ่มเพื่อน OA <b id="line-oa-name">เตือนหมดอายุ</b></li>
+              <li>พิมพ์ข้อความนี้ในแชต:</li>
+            </ol>
+            <div class="bg-gray-100 rounded-xl p-3 text-center">
+              <div class="text-xs text-gray-400">พิมพ์ในแชต OA</div>
+              <div class="text-2xl font-bold tracking-wider text-gray-800 mt-1">เชื่อม <span id="line-link-code">----</span></div>
+            </div>
+            <p id="line-link-exp" class="text-xs text-amber-500 text-center mt-2">โค้ดหมดอายุใน 10 นาที</p>
+            <button id="line-link-regen" class="w-full mt-3 py-2 rounded-xl border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">สร้างโค้ดใหม่</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== TOAST + CONFIRM (ป็อปอัพสวยๆ) ===================== -->
   <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[70] flex flex-col items-center gap-2 pointer-events-none w-full px-4 max-w-sm"></div>
 
@@ -747,6 +798,7 @@
       const todos = (await this.getTodos()).filter(t => t.id !== id);
       await this._saveTodos(todos);
     },
+    async createLinkCode() { return null; }, // เชื่อม LINE ใช้ได้เฉพาะโหมด Firebase
   };
 
   // --- โหมด Google Apps Script ---
@@ -777,6 +829,7 @@
     async addTodo()        { return null; },
     async updateTodo()     { /* no-op */ },
     async removeTodo()     { /* no-op */ },
+    async createLinkCode() { return null; }, // เชื่อม LINE ใช้ได้เฉพาะโหมด Firebase
   };
 
   // --- โหมด Firebase (Cloud Firestore + Google Login) ---
@@ -849,6 +902,13 @@
       },
       async removeTodo(id) {
         await deleteDoc(doc(db, 'users', uid, 'todos', id));
+      },
+      // ----- เชื่อมบัญชี LINE: สร้างโค้ดให้ผู้ใช้ไปพิมพ์ในบอท -----
+      async createLinkCode() {
+        const code = String(Math.floor(10000 + Math.random() * 90000)); // 5 หลัก
+        const exp = Date.now() + 10 * 60 * 1000; // หมดอายุ 10 นาที
+        await setDoc(doc(db, 'linkCodes', code), { uid, exp, createdAt: new Date().toISOString() });
+        return { code, exp };
       },
       // อ่านข้อมูลจาก collection กลางเดิม (ก่อนมีระบบล็อกอิน) — ใช้ย้ายข้อมูลครั้งเดียว
       async _legacyItems() {
@@ -2434,6 +2494,11 @@
     document.getElementById('profile-name').textContent = user.displayName || 'ผู้ใช้';
     document.getElementById('profile-email').textContent = user.email || '';
     updateProfileStats();
+    // อัปเดตป้ายสถานะเชื่อม LINE ในเมนู
+    Store.getMeta('lineLinked').then(v => {
+      const b = document.getElementById('line-link-badge');
+      if (b) b.textContent = v ? '✅' : '';
+    }).catch(() => {});
   }
 
   // อัปเดตสถิติในเมนูโปรไฟล์
@@ -2455,6 +2520,46 @@
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#profile-wrap')) profileMenu.classList.add('hidden');
   });
+
+  /* =========================================================
+     เชื่อมบัญชี LINE
+     ========================================================= */
+  const lineLinkModal = document.getElementById('line-link-modal');
+  function openLineLink() {
+    profileMenu.classList.add('hidden');
+    lineLinkModal.classList.remove('hidden');
+    requestAnimationFrame(() => lineLinkModal.classList.remove('modal-hidden'));
+    refreshLineLinkUI();
+  }
+  function closeLineLink() {
+    lineLinkModal.classList.add('modal-hidden');
+    lineLinkModal.addEventListener('transitionend', () => lineLinkModal.classList.add('hidden'), { once: true });
+  }
+  async function refreshLineLinkUI() {
+    const done = !!(await Store.getMeta('lineLinked'));
+    document.getElementById('line-link-done').classList.toggle('hidden', !done);
+    document.getElementById('line-link-start').classList.toggle('hidden', done);
+    document.getElementById('line-link-code-box').classList.add('hidden');
+    // ป้ายสถานะในเมนู
+    const badge = document.getElementById('line-link-badge');
+    if (badge) badge.textContent = done ? '✅' : '';
+  }
+  async function genLinkCode() {
+    try {
+      const res = await Store.createLinkCode();
+      if (!res) { showToast('ใช้ได้เฉพาะตอนล็อกอินด้วย Google', 'error'); return; }
+      document.getElementById('line-link-code').textContent = res.code;
+      document.getElementById('line-link-start').classList.add('hidden');
+      document.getElementById('line-link-code-box').classList.remove('hidden');
+    } catch (err) {
+      showToast('สร้างโค้ดไม่สำเร็จ: ' + (err.message || err), 'error');
+    }
+  }
+  document.getElementById('btn-line-link').addEventListener('click', openLineLink);
+  document.getElementById('line-link-close').addEventListener('click', closeLineLink);
+  document.getElementById('line-link-backdrop').addEventListener('click', closeLineLink);
+  document.getElementById('line-link-gen').addEventListener('click', genLinkCode);
+  document.getElementById('line-link-regen').addEventListener('click', genLinkCode);
 
   /* =========================================================
      PWA: ลงทะเบียน Service Worker (ทำงานออฟไลน์ + ติดตั้งได้)
