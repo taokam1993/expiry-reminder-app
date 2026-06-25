@@ -3,7 +3,7 @@
  *  ทำให้แอปเปิดได้แบบออฟไลน์ (cache app shell)
  *  *** เปลี่ยนเลข CACHE_VERSION ทุกครั้งที่แก้ไฟล์ เพื่อบังคับอัปเดต ***
  * ========================================================= */
-const CACHE_VERSION = 'v19';
+const CACHE_VERSION = 'v20';
 const CACHE_NAME = `reminder-app-${CACHE_VERSION}`;
 
 // ไฟล์หลักของแอป (App Shell) ที่ต้อง cache ไว้ให้ใช้ออฟไลน์
@@ -21,6 +21,11 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
   );
   self.skipWaiting(); // เปิดใช้ SW ใหม่ทันที
+});
+
+// ----- รับคำสั่งจากหน้าเว็บให้ข้ามไปใช้ SW ใหม่ทันที -----
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // ----- เปิดใช้งาน: ลบ cache เวอร์ชันเก่า -----
