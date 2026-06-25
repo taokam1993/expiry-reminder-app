@@ -2496,17 +2496,11 @@
     const errEl = document.getElementById('login-error');
     errEl.classList.add('hidden');
     const provider = new _fb.authMod.GoogleAuthProvider();
-    // มือถือ/PWA: popup มักมีปัญหาบน iOS -> ใช้ redirect แทน (เสถียรกว่า)
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-      || navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+    // ใช้ popup เป็นหลัก — ผลส่งกลับผ่าน postMessage ไม่ติด Safari ITP (cookie ข้ามโดเมน)
     try {
-      if (isMobile) {
-        await _fb.authMod.signInWithRedirect(_fb.auth, provider);
-      } else {
-        await _fb.authMod.signInWithPopup(_fb.auth, provider);
-      }
+      await _fb.authMod.signInWithPopup(_fb.auth, provider);
     } catch (err) {
-      // popup ถูกบล็อก/ล้มเหลว -> ลอง redirect
+      // ถ้า popup ถูกบล็อก (บางเบราว์เซอร์/PWA) -> ค่อย fallback เป็น redirect
       if (/popup/i.test(err.code || '')) {
         try { await _fb.authMod.signInWithRedirect(_fb.auth, provider); return; } catch (e2) { err = e2; }
       }
