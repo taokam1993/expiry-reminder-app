@@ -2395,9 +2395,9 @@
         if (user) {
           loginScreen.classList.add('hidden');
           profileWrap.classList.remove('hidden');
-          setProfile(user);
-          Store = makeUserStore(user.uid);
+          Store = makeUserStore(user.uid);   // ต้องตั้งก่อน setProfile (setProfile อ่าน Store.getMeta)
           _currentUid = user.uid;
+          setProfile(user);
           // แสดงข้อมูลจาก cache ทันที (ถ้ามี) แล้วค่อยซิงค์เบื้องหลัง
           const cached = loadCache(user.uid);
           if (cached) {
@@ -2495,10 +2495,12 @@
     document.getElementById('profile-email').textContent = user.email || '';
     updateProfileStats();
     // อัปเดตป้ายสถานะเชื่อม LINE ในเมนู
-    Store.getMeta('lineLinked').then(v => {
-      const b = document.getElementById('line-link-badge');
-      if (b) b.textContent = v ? '✅' : '';
-    }).catch(() => {});
+    if (Store && Store.getMeta) {
+      Store.getMeta('lineLinked').then(v => {
+        const b = document.getElementById('line-link-badge');
+        if (b) b.textContent = v ? '✅' : '';
+      }).catch(() => {});
+    }
   }
 
   // อัปเดตสถิติในเมนูโปรไฟล์
