@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#1e3a8a" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <!-- พื้นหลังเต็มสี่เหลี่ยม (iOS/Android จะ mask มุมเอง) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- วงเป้าโฟกัส -->
+  <g filter="url(#soft)">
+    <circle cx="256" cy="256" r="150" fill="none" stroke="#ffffff" stroke-opacity="0.38" stroke-width="22"/>
+    <circle cx="256" cy="256" r="98"  fill="none" stroke="#ffffff" stroke-opacity="0.72" stroke-width="22"/>
+    <circle cx="256" cy="256" r="60"  fill="#ffffff"/>
+  </g>
+  <!-- เครื่องหมายถูกตรงกลาง -->
+  <path d="M231 257 l17 18 l33 -38" fill="none" stroke="#2563EB" stroke-width="17"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

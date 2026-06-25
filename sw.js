@@ -3,7 +3,7 @@
  *  ทำให้แอปเปิดได้แบบออฟไลน์ (cache app shell)
  *  *** เปลี่ยนเลข CACHE_VERSION ทุกครั้งที่แก้ไฟล์ เพื่อบังคับอัปเดต ***
  * ========================================================= */
-const CACHE_VERSION = 'v30';
+const CACHE_VERSION = 'v31';
 const CACHE_NAME = `reminder-app-${CACHE_VERSION}`;
 
 // ไฟล์หลักของแอป (App Shell) ที่ต้อง cache ไว้ให้ใช้ออฟไลน์
@@ -11,6 +11,7 @@ const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './icons/logo.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
 ];
